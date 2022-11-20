@@ -10,6 +10,7 @@ struct JobInformation {
   double termalDifusivity = 0;
   double cellDimensions = 0;
   double equilibriumPointSentivity = 0;
+  int plateRepeatIndex = 1;
 
   JobInformation(){}
 };

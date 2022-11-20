@@ -1,0 +1,11 @@
+make --dry-run --always-make --keep-going --print-directory
+make: Entering directory '/home/josephvalverde/proy2_simulacion_de_transferencia_de_calor_concurrente'
+mkdir -p build/
+ 
+g++ -c -Wall -Wextra -g -std=gnu++11 -Isrc -MMD src/TermalTransferSimulation.cpp -o build/TermalTransferSimulation.o
+g++ -c -Wall -Wextra -g -std=gnu++11 -Isrc -MMD src/main.cpp -o build/main.o
+mkdir -p bin/
+ 
+g++ -Wall -Wextra -g -Isrc build/TermalTransferSimulation.o build/main.o -o bin/proy2_simulacion_de_transferencia_de_calor_concurrente 
+make: Leaving directory '/home/josephvalverde/proy2_simulacion_de_transferencia_de_calor_concurrente'
+ 
