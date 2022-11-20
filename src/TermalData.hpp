@@ -1,3 +1,5 @@
+/* Copyright 2022 Joseph Stuart Valverde Kong.
+Universidad de Costa Rica. CC BY 4.0 */
 #ifndef TERMALDATA_HPP
 #define TERMALDATA_HPP
 
