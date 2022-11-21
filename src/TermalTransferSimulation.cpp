@@ -4,6 +4,11 @@ Universidad de Costa Rica. CC BY 4.0 */
 #include <utility>
 #include <ctime>
 #include <iomanip>
+#include <omp.h>
+#include <thread>
+#include <mpi.h>
+
+#include <semaphore.h>
 
 #include "TermalTransferSimulation.hpp"
 #include "TermalData.hpp"
@@ -16,7 +21,7 @@ Universidad de Costa Rica. CC BY 4.0 */
  * @param jobInformation parameters for processing
  */
 void runStage(Matrix<double>& data, Matrix<double>& newData,
-JobInformation* jobInformation);
+JobInformation* jobInformation, int32_t threadAmount);
 
 /**
  * @brief checks if equilibrium has been reached according to given parameters
@@ -46,9 +51,42 @@ void writeReport(std::vector<JobInformation>& jobsInformation, std::string fileN
  */
 static std::string format_time(const time_t seconds);
 
+// runs termal transfer simulation
+void TermalTransferS::runTermalTransferSimulation(int& argc, char**& argv) {
+  if (argc > 1) {
+    // get file name
+    std::string fileName(argv[1]);
+
+    int32_t threadAmount = std::thread::hardware_concurrency();
+
+    if (argc == 3) {
+      threadAmount = std::stoi(argv[2]);
+    }
+
+    // get job data
+    std::vector<JobInformation>* jobData =
+    TermalTransferS::getJobData(fileName);
+
+    // process everything
+    TermalTransferS::processAllJobs(jobData, fileName, threadAmount);
+
+    // erase everything
+    TermalTransferS::eraseJobData(jobData);
+  }
+}
+
 // returns a vector of jobs found within file from file name
 std::vector<JobInformation>* TermalTransferS::getJobData
 (std::string& fileName) {
+  // Initiate mpi connection environment
+  if (MPI_Init(&argc, &argv) != MPI_SUCCESS) {
+    return EXIT_FAILURE;
+  }
+
+  int rank = 0;
+
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  
   // create vector for jobs
   std::vector<JobInformation>* dataVector = new std::vector<JobInformation>();
 
@@ -131,13 +169,14 @@ std::vector<JobInformation>* TermalTransferS::getJobData
 }
 
 // processess all jobs in the vector
-void TermalTransferS::processAllJobs(std::vector<JobInformation>* jobs, std::string& fileName) {
+void TermalTransferS::processAllJobs(std::vector<JobInformation>* jobs,
+    std::string& fileName, int32_t threadAmount) {
   int jobsAmount = jobs->size();
 
   // for all jobs
   for (int currentJob = 0; currentJob < jobsAmount; ++currentJob) {
     // process them
-    processJob(&(*jobs)[currentJob]);
+    processJob(&(*jobs)[currentJob], threadAmount);
   }
 
   writeReport(*jobs, fileName);
@@ -165,7 +204,9 @@ void debugMatrix(Matrix<double>& matrix) {
 }
 
 // processess the given job
-void TermalTransferS::processJob(JobInformation* jobInformation) {
+void TermalTransferS::processJob
+    (JobInformation* jobInformation, int32_t threadAmount) {
+
   // get the matrix out of the file
   Matrix<double>* data = getMatrix(jobInformation);
 
@@ -190,8 +231,12 @@ void TermalTransferS::processJob(JobInformation* jobInformation) {
   // while the matrix is not in equilibrium
   while (!inEquilibrium) {
     // run a stage/find state
-    runStage(*data, *newData, jobInformation);
-
+    #pragma omp parallel num_threads(threadAmount) \
+    default(none) shared(data, newData, jobInformation, threadAmount)
+    {
+      runStage(*data, *newData, jobInformation, threadAmount);
+    }
+    
     // check if in equilibrium
     inEquilibrium =
     checkEquilibrium(*data, *newData,
@@ -218,7 +263,7 @@ void TermalTransferS::processJob(JobInformation* jobInformation) {
 
 // returns a matrix of the data found in the file data
 void runStage(Matrix<double>& data, Matrix<double>& newData,
-JobInformation* jobInformation) {
+JobInformation* jobInformation, int32_t threadAmount) {
   // get sizes
   size_t rowAmount = data.size(),
       colAmount = data[0].size();
@@ -230,8 +275,8 @@ JobInformation* jobInformation) {
       jobInformation->cellDimensions * jobInformation->cellDimensions;
 
   // for each row
+  #pragma omp for
   for (size_t row = 1; row < rowAmount - 1; ++row) {
-    // TODO(me): run a thread for each of these
     // for each column
     for (size_t col = 1; col < colAmount - 1; ++col) {
       // find the sum of neighbors

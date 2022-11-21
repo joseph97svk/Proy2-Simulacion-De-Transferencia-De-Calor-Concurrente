@@ -23,6 +23,15 @@ template <typename dataType>
 using Matrix = std::vector<std::vector<dataType>>;
 
 namespace TermalTransferS {
+
+  /**
+   * @brief runs termal transfer simulation
+   * 
+   * @param argc argument count
+   * @param argv argument vector
+   */
+  void runTermalTransferSimulation(int& argc, char**& argv);
+
   /**
    * @brief returns a vector of jobs found within file from file name
    * 
@@ -37,14 +46,15 @@ namespace TermalTransferS {
    * @param jobs vector of jobs to be processed
    * @param fileName name of file where jobs were extracted
    */
-  void processAllJobs(std::vector<JobInformation>* jobs, std::string& fileName);
+  void processAllJobs(std::vector<JobInformation>* jobs,
+  std::string& fileName, int32_t threadAmount);
 
   /**
    * @brief processess the given job
    * 
    * @param jobInformation job to be processed
    */
-  void processJob(JobInformation* jobInformation);
+  void processJob(JobInformation* jobInformation, int32_t threadAmount);
 
   /**
    * @brief returns a matrix of the data found in the file data
