@@ -1,8 +1,9 @@
 /* Copyright 2022 Joseph Stuart Valverde Kong.
 Universidad de Costa Rica. CC BY 4.0 */
 #include <cstdlib>
-#include <map>
 #include <utility>
+#include <ctime>
+#include <iomanip>
 
 #include "TermalTransferSimulation.hpp"
 #include "TermalData.hpp"
@@ -28,6 +29,22 @@ JobInformation* jobInformation);
  */
 bool checkEquilibrium(Matrix<double>& data, Matrix<double>& newData,
 const double equilibriumPointSentivity);
+
+/**
+ * @brief writes report of all simulations
+ * 
+ * @param jobsInformation information on all jobs
+ * @param fileName name of file where all jobs were listed
+ */
+void writeReport(std::vector<JobInformation>& jobsInformation, std::string fileName);
+
+/**
+ * @brief gets the time formated as string
+ * 
+ * @param seconds amount of seconds taken
+ * @return std::string
+ */
+static std::string format_time(const time_t seconds);
 
 // returns a vector of jobs found within file from file name
 std::vector<JobInformation>* TermalTransferS::getJobData
@@ -59,8 +76,6 @@ std::vector<JobInformation>* TermalTransferS::getJobData
     extension = fileName.substr(0, position);
   }
 
-  std::map<std::string, int> namesMap;
-
   int dataPosition = 0;
   int jobsFoundAmount  = 0;
   std::string currentData;
@@ -75,8 +90,6 @@ std::vector<JobInformation>* TermalTransferS::getJobData
       // place the file name
       case 0:
         (*dataVector)[jobsFoundAmount].fileName = currentData.c_str();
-        namesMap[currentData] += 1;
-        (*dataVector)[jobsFoundAmount].plateRepeatIndex = namesMap[currentData];
         break;
       // place the time
       case 1:
@@ -118,7 +131,7 @@ std::vector<JobInformation>* TermalTransferS::getJobData
 }
 
 // processess all jobs in the vector
-void TermalTransferS::processAllJobs(std::vector<JobInformation>* jobs) {
+void TermalTransferS::processAllJobs(std::vector<JobInformation>* jobs, std::string& fileName) {
   int jobsAmount = jobs->size();
 
   // for all jobs
@@ -126,6 +139,8 @@ void TermalTransferS::processAllJobs(std::vector<JobInformation>* jobs) {
     // process them
     processJob(&(*jobs)[currentJob]);
   }
+
+  writeReport(*jobs, fileName);
 }
 
 /**
@@ -193,6 +208,8 @@ void TermalTransferS::processJob(JobInformation* jobInformation) {
     // increase stages processed
     stageCount++;
   }
+
+  jobInformation->stateAmountRequired = stageCount;
 
   // write results on new file
   writeMatrixOnFile(*newData, jobInformation);
@@ -309,7 +326,7 @@ void TermalTransferS::writeMatrixOnFile(Matrix<double>& dataMatrix,
   // get new file name
   std::string newFileName = jobInformation->extension +
       jobInformation->fileName.substr(0, jobInformation->fileName.size() - 4)
-      + "-" + std::to_string(jobInformation->plateRepeatIndex) +".bin";
+      + "-" + std::to_string(jobInformation->stateAmountRequired) +".bin";
 
   // create binary file
   std::ofstream newFile(newFileName, std::ios::binary);
@@ -339,4 +356,44 @@ void TermalTransferS::writeMatrixOnFile(Matrix<double>& dataMatrix,
 void TermalTransferS::eraseJobData(std::vector<JobInformation>* jobData) {
   // erases job data
   delete(jobData);
+}
+
+void writeReport(std::vector<JobInformation>& jobsInformation, std::string fileName) {
+  // open file
+  std::ifstream file;
+  file.open(fileName);
+
+  std::string newFileName = jobsInformation[0].extension +
+      fileName.substr(0, fileName.size() - 4) +".tsv";;
+
+  // create binary file
+  std::ofstream newFile(newFileName, std::ios::binary);
+
+  std::string current;
+
+  int job = 0;
+  // for each line read
+  while (getline(file, current)) {
+    // write it to the new file
+    newFile << current;
+    // get the time
+    double totalTime = jobsInformation[job].stageTimeDuration *
+    jobsInformation[job].stateAmountRequired;
+    // add time information
+    newFile << std::setfill(' ') << std::setw(30) << format_time(totalTime);
+    // next line
+    newFile << "\n";
+    ++job;
+  }
+  file.close();
+  newFile.close();
+}
+
+static std::string format_time(const time_t seconds) {
+  // TODO(any): Using C until C++20 std::format() is implemented by compilers
+  char text[48];  // YYYY/MM/DD hh:mm:ss
+  const std::tm& gmt = * std::gmtime(&seconds);
+  snprintf(text, sizeof(text), "%04d/%02d/%02d\t%02d:%02d:%02d", gmt.tm_year
+    - 70, gmt.tm_mon, gmt.tm_mday - 1, gmt.tm_hour, gmt.tm_min, gmt.tm_sec);
+  return text;
 }

@@ -6,7 +6,7 @@ make all --print-data-base --no-builtin-variables --no-builtin-rules --question
 # This is free software: you are free to change and redistribute it.
 # There is NO WARRANTY, to the extent permitted by law.
 
-# Make data base, printed on Sun Nov 20 12:25:33 2022
+# Make data base, printed on Sun Nov 20 17:46:24 2022
 
 # Variables
 
@@ -95,6 +95,7 @@ ZYPAK_SPAWN_LATEST_ON_REEXEC = 0
 # makefile (from 'Makefile', line 14)
 LINTF = -build/header_guard,-build/include_subdir
 # makefile
+ 
 CURDIR := /home/josephvalverde/proy2_simulacion_de_transferencia_de_calor_concurrente
 # makefile (from 'Makefile', line 47)
 DEPENDS = $(OBJECTS:%.o=%.d)
@@ -135,7 +136,7 @@ VSCODE_VERBOSE_LOGGING = true
 # environment
 VSCODE_PID = 23
 # makefile (from 'Makefile', line 5)
-XC = g++
+XC = mpic++
 # environment
 XDG_SESSION_TYPE = x11
 # makefile (from 'Makefile', line 33)
@@ -147,7 +148,7 @@ SOURCEC = $(wildcard $(DIRS:%=%/*.c))
 # environment
 AT_SPI_BUS_ADDRESS = unix:path=/run/flatpak/at-spi-bus
 # makefile (from 'Makefile', line 10)
-FLAGS = $(strip -Wall -Wextra $(FLAG) $(DEFS))
+FLAGS = $(strip -Wall -Wextra $(FLAG) $(DEFS) -fopenmp)
 # environment
 XDG_DATA_HOME = /home/josephvalverde/.var/app/com.visualstudio.code/data
 # environment
@@ -298,7 +299,6 @@ ELECTRON_RUN_AS_NODE = 1
 VSCODE_IPC_HOOK = /run/user/1000/vscode-bc146970-1.67.0-main.sock
 # makefile (from 'Makefile', line 24)
 TST_DIR = tests
- 
 # makefile (from 'Makefile', line 41)
 OBJECTC = $(SOURCEC:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
 # makefile (from 'Makefile', line 11)
@@ -328,7 +328,7 @@ LINTX = $(LINTF),-build/c++11,-runtime/references
 # default
 .FEATURES := target-specific order-only second-expansion else-if shortest-stem undefine oneshell nocomment grouped-target extra-prereqs archives jobserver output-sync check-symlink load
 # makefile (from 'Makefile', line 4)
-CC = gcc
+CC = mpicc
 # environment
 FLATPAK_ID = com.visualstudio.code
 # environment
@@ -350,10 +350,10 @@ build/output%.txt :
 # Directories
 
 # src (device 66314, inode 2056328): 6 files, no impossibilities.
-# . (device 66314, inode 2056198): 11 files, no impossibilities.
+# . (device 66314, inode 2056198): 17 files, no impossibilities.
 # tests: could not be stat'd.
 
-# 17 files, no impossibilities in 3 directories.
+# 23 files, no impossibilities in 3 directories.
 
 # Implicit Rules
 
@@ -399,6 +399,7 @@ instdeps:
 #  File has not been updated.
 #  recipe to execute (from 'Makefile', line 131):
 	sudo apt install build-essential clang valgrind icdiff doxygen graphviz \
+ 
 	python3-pip python3-gpg && sudo pip3 install cpplint
 
 build/TermalTransferSimulation.o: src/TermalTransferSimulation.cpp src/TermalTransferSimulation.hpp src/TermalData.hpp
@@ -457,7 +458,7 @@ debug: bin/proy2_simulacion_de_transferencia_de_calor_concurrente
 # Not a target:
 Makefile:
 #  Implicit rule search has been done.
-#  Last modified 2022-08-22 19:28:32.473756
+#  Last modified 2022-11-20 17:46:18.60089409
 #  File has been updated.
 #  Successfully updated.
 
@@ -470,7 +471,7 @@ bin/.:
 # Not a target:
 src/main.cpp:
 #  Implicit rule search has been done.
-#  Last modified 2022-11-20 00:18:15.122127989
+#  Last modified 2022-11-20 17:09:33.025636012
 #  File has been updated.
 #  Successfully updated.
 
@@ -485,7 +486,7 @@ clean:
 # Not a target:
 src/TermalTransferSimulation.hpp:
 #  Implicit rule search has been done.
-#  Last modified 2022-11-19 23:23:41.781640096
+#  Last modified 2022-11-20 17:09:26.601544665
 #  File has been updated.
 #  Successfully updated.
 
@@ -501,7 +502,7 @@ ubsan: debug
 # Not a target:
 build/TermalTransferSimulation.d:
 #  Implicit rule search has been done.
-#  Last modified 2022-11-20 00:31:22.340789109
+#  Last modified 2022-11-20 17:45:26.888163927
 #  File has been updated.
 #  Successfully updated.
 
@@ -589,7 +590,6 @@ help:
 	@echo "Variables:"
 	@echo "  CC: C compiler. XC: C++ compiler. C/XSTD: Force a C/C++ standard"
 	@echo "  DEFS: preprocessor symbols. FLAG: compiler flags"
- 
 	@echo "  LIBS: libraries to be linked"
 	@echo "  ARGS: execution arguments"
 
@@ -612,7 +612,7 @@ memcheck: bin/proy2_simulacion_de_transferencia_de_calor_concurrente
 # Not a target:
 build/main.d:
 #  Implicit rule search has been done.
-#  Last modified 2022-11-20 00:31:22.024784841
+#  Last modified 2022-11-20 17:38:29.214262494
 #  File has been updated.
 #  Successfully updated.
 
@@ -625,7 +625,7 @@ test: bin/proy2_simulacion_de_transferencia_de_calor_concurrente
 # Not a target:
 src/TermalTransferSimulation.cpp:
 #  Implicit rule search has been done.
-#  Last modified 2022-11-20 00:32:27.217665278
+#  Last modified 2022-11-20 17:45:19.144054583
 #  File has been updated.
 #  Successfully updated.
 
@@ -647,6 +647,7 @@ asan: debug
 release: FLAGS += -O3 -DNDEBUG
 release: bin/proy2_simulacion_de_transferencia_de_calor_concurrente
 #  Implicit rule search has not been done.
+ 
 #  Modification time never checked.
 #  File has not been updated.
 # variable set hash-table stats:
@@ -697,7 +698,7 @@ bin/proy2_simulacion_de_transferencia_de_calor_concurrente: build/TermalTransfer
 # Not a target:
 src/TermalData.hpp:
 #  Implicit rule search has been done.
-#  Last modified 2022-11-19 23:23:41.789640204
+#  Last modified 2022-11-20 17:00:07.329628642
 #  File has been updated.
 #  Successfully updated.
 
@@ -709,12 +710,12 @@ src/TermalData.hpp:
 
 # No general ('VPATH' variable) search path.
 
-# strcache buffers: 1 (0) / strings = 56 / storage = 657 B / avg = 11 B
-# current buf: size = 8162 B / used = 657 B / count = 56 / avg = 11 B
+# strcache buffers: 1 (0) / strings = 62 / storage = 754 B / avg = 12 B
+# current buf: size = 8162 B / used = 754 B / count = 62 / avg = 12 B
 
-# strcache performance: lookups = 142 / hit rate = 60%
+# strcache performance: lookups = 148 / hit rate = 58%
 # hash-table stats:
-# Load=56/8192=1%, Rehash=0, Collisions=0/142=0%
-# Finished Make data base on Sun Nov 20 12:25:33 2022
+# Load=62/8192=1%, Rehash=0, Collisions=0/148=0%
+# Finished Make data base on Sun Nov 20 17:46:24 2022
 
  

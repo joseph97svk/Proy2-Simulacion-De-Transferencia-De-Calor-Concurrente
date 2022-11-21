@@ -35,8 +35,9 @@ namespace TermalTransferS {
    * @brief processess all jobs in the vector
    * 
    * @param jobs vector of jobs to be processed
+   * @param fileName name of file where jobs were extracted
    */
-  void processAllJobs(std::vector<JobInformation>* jobs);
+  void processAllJobs(std::vector<JobInformation>* jobs, std::string& fileName);
 
   /**
    * @brief processess the given job

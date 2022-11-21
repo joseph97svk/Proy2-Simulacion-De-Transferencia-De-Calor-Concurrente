@@ -12,7 +12,7 @@ int main(int argc, char* argv[]) {
     TermalTransferS::getJobData(fileName);
 
     // process everything
-    TermalTransferS::processAllJobs(jobData);
+    TermalTransferS::processAllJobs(jobData, fileName);
 
     // erase everything
     TermalTransferS::eraseJobData(jobData);
