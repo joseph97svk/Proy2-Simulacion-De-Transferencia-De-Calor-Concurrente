@@ -1,0 +1,83 @@
+= Proy2: Simulación de calor distribuida =
+
+== Summary ==
+
+*Author(s):* Joseph Valverde
+
+*Description:* Repository for Proyect 2: Simulation of Distributed Hear
+
+:keywords: 
+
+*Keywords:* {keywords}.
+
+== Analisis ==
+
+=== Description ===
+
+The simulation of heat of heat through a plate is an example of a scientific application of computing. As a plate can be distributed in several sectors, each of which requires the calculation of its state, this application is also a prime problem where data parallelism can be applied. 
+
+This proyect aims to simulate the distribution of heat through a plate, from its entry through the borders of the plate, up until a point of equilibrium is reached. Data is read from a binary file and read as matrix to be processed. The plate to be analized is to be subdivided into cells, each of which is to hold the value of its heat amount, which can change over time. The new value of heat for a cell after a given amount of time can be given as:
+
+
+Where the new temperature is given as the previous temperature plus a new state which depends on the time taken, the heat diffision value of the material, the dimensions of each cell, as well as the sum of the sorrounding cells and the expected loss of heat. The program is expected to calculate this states until reaching a defined point of equilibrium. This state of equilibrium is reached when no cells experience a change greater than a defined epsilon from one stage to the next. Once equilibrium has been reached, the resulting plate must be reported in a binary file and the time taken reported in a separate file.
+
+
+==== Part 1 ====
+
+This part or milestone of the project is to have a concurrent version of the solution capable to performing its tasks as expected with correctness of its calculations and resulting outputs.
+
+For the first part or milestone of this project the following are expected:
+
+  1. To have first completed a serial version which is expected to have passed correctness testing and as such produce correct results. 
+
+  2. Design and implement a concurrent optimization of the previous solution utilizing the OpenMp technology. 
+
+  3. To measure the time taken for the serial version as well as the concurrent version and measure the improvement of performance when comparing the first to the former.
+
+==== Part 2 ====
+
+This part or milestone of the project is to have concurrent solution utilizing both threading concurrency as well as process concurrency utilizing both OpenMP as well MPI technologies.
+
+For the second part or milestone of this project the following are expected:
+
+  1. To analize the current solution and reach a design decision for the use of MPI along with the previously implemented OpenMP solution.
+
+  2. To include in such design a balanced distribution of tasks between the processes with the use of a balanced descomposition unit of work.
+
+  3. To implement such solution by including the use of MPI
+
+  4. To measure the difference in performance when compared with the previous solution and in conjunction to the former in different differing combinations
+
+=== User Manual ===
+
+There are multiple ways of using this program. 
+
+==== Without MPI technology ====
+
+The program can be initiated through the terminal by calling its executable a long with the job txt format file to be processed, such as:
+
+- `bin/proy2_simulacion_de_transferencia_de_calor_concurrente jobs/job001.txt`
+
+In this previous case, the program will run with the amount of threads that is supported by the system. If it is desired to define the amount of threads to be used, these would be given as a third parameter as following:
+
+- `bin/proy2_simulacion_de_transferencia_de_calor_concurrente jobs/job001.txt [thread_number]`
+
+==== Using MPI technology ====
+
+For the execution of the program using multiple processes with the MPI technology it is necessary to call it along with the amount of processes to be used as following:
+
+- `mpiexec -np <process_number> bin/proy2_simulacion_de_transferencia_de_calor_concurrente jobs/job001.txt [thread_number]`
+
+Where the thread number is, once again, optional. 
+
+==== Using single process MPI technology ====
+
+=== Perfomance Analisis ===
+
+=== Credits ===
+
+Joseph Stuart Valverde Kong
+UCR student in Computación en varios Énfasis, C18100
+
+*Email:* joseph.valverdekong@ucr.ac.cr
+

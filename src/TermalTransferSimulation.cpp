@@ -63,30 +63,49 @@ void TermalTransferS::runTermalTransferSimulation(int& argc, char**& argv) {
       threadAmount = std::stoi(argv[2]);
     }
 
-    // get job data
-    std::vector<JobInformation>* jobData =
-    TermalTransferS::getJobData(fileName);
+    // Initiate mpi connection environment
+    if (MPI_Init(&argc, &argv) != MPI_SUCCESS) {
+      return EXIT_FAILURE;
+    }
 
-    // process everything
-    TermalTransferS::processAllJobs(jobData, fileName, threadAmount);
+    int rank = 0, size = 0;
 
-    // erase everything
-    TermalTransferS::eraseJobData(jobData);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+
+    if (size == 1) {
+      // get job data
+      std::vector<JobInformation>* jobData =
+      TermalTransferS::getJobData(fileName);
+
+      // process everything
+      TermalTransferS::processAllJobs(jobData, fileName, threadAmount);
+
+      // erase everything
+      TermalTransferS::eraseJobData(jobData);
+    } else {
+      if (rank == 0) {
+
+      } else {
+
+      }
+    }
+
   }
+}
+
+void mpiRank0() {
+
+}
+
+void mpiRankAny() {
+
 }
 
 // returns a vector of jobs found within file from file name
 std::vector<JobInformation>* TermalTransferS::getJobData
 (std::string& fileName) {
-  // Initiate mpi connection environment
-  if (MPI_Init(&argc, &argv) != MPI_SUCCESS) {
-    return EXIT_FAILURE;
-  }
-
-  int rank = 0;
-
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-  
   // create vector for jobs
   std::vector<JobInformation>* dataVector = new std::vector<JobInformation>();
 
