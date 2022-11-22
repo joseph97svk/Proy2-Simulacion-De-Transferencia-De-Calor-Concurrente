@@ -4,9 +4,9 @@
 
 *Author(s):* Joseph Valverde
 
-*Description:* Repository for Proyect 2: Simulation of Distributed Hear
+*Description:* Repository for Proyect 2: Simulation of Distributed Heat
 
-:keywords: 
+:keywords: matrix, heat, equilibrium, distribution, concurrency
 
 *Keywords:* {keywords}.
 
@@ -19,7 +19,7 @@ The simulation of heat of heat through a plate is an example of a scientific app
 This proyect aims to simulate the distribution of heat through a plate, from its entry through the borders of the plate, up until a point of equilibrium is reached. Data is read from a binary file and read as matrix to be processed. The plate to be analized is to be subdivided into cells, each of which is to hold the value of its heat amount, which can change over time. The new value of heat for a cell after a given amount of time can be given as:
 
 
-Where the new temperature is given as the previous temperature plus a new state which depends on the time taken, the heat diffision value of the material, the dimensions of each cell, as well as the sum of the sorrounding cells and the expected loss of heat. The program is expected to calculate this states until reaching a defined point of equilibrium. This state of equilibrium is reached when no cells experience a change greater than a defined epsilon from one stage to the next. Once equilibrium has been reached, the resulting plate must be reported in a binary file and the time taken reported in a separate file.
+Where the new temperature is given as the previous temperature plus a new state which depends on the time taken, the heat diffision value of the material, the dimensions of each cell, as well as the sum of the surrounding cells and the expected loss of heat. The program is expected to calculate this states until reaching a defined point of equilibrium. This state of equilibrium is reached when no cells experience a change greater than a defined epsilon from one stage to the next. Once equilibrium has been reached, the resulting plate must be reported in a binary file and the time taken reported in a separate file.
 
 
 ==== Part 1 ====
@@ -72,7 +72,14 @@ Where the thread number is, once again, optional.
 
 ==== Using single process MPI technology ====
 
+It is also possible to run using the MPI technology but with a single process. As odd as it may sound, depending on the device and software configurations this may lead to either better or worse performance, so it may be up to the user to test the right configuration to run. This may be run using the following:
+
+- `mpiexec -np 1 bin/proy2_simulacion_de_transferencia_de_calor_concurrente jobs/job001.txt [thread_number]`
+
+
 === Perfomance Analisis ===
+
+Performance analisis here
 
 === Credits ===
 

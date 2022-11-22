@@ -13,6 +13,18 @@ Universidad de Costa Rica. CC BY 4.0 */
 #include "TermalTransferSimulation.hpp"
 #include "TermalData.hpp"
 
+void mpiRank0(std::string fileName, const int32_t size);
+
+void sendData(std::vector<JobInformation>& jobData, std::string& fileName,
+    int32_t* stringSizes, double* dataToSend, int32_t* jobLocationArr);
+
+void stopProcessess(int32_t* stringSizes, const int32_t size);
+
+void mpiRankAny(const int32_t rank, const int32_t threadAmount);
+
+int32_t receiveData(std::vector<JobInformation>& jobs, int32_t& processedJobs,
+    int32_t* stringSizes, double* jobData, const int32_t rank);
+
 /**
  * @brief runs a stage of the simulation
  * 
@@ -65,7 +77,7 @@ void TermalTransferS::runTermalTransferSimulation(int& argc, char**& argv) {
 
     // Initiate mpi connection environment
     if (MPI_Init(&argc, &argv) != MPI_SUCCESS) {
-      return EXIT_FAILURE;
+      return;
     }
 
     int rank = 0, size = 0;
@@ -84,23 +96,178 @@ void TermalTransferS::runTermalTransferSimulation(int& argc, char**& argv) {
 
       // erase everything
       TermalTransferS::eraseJobData(jobData);
+
     } else {
       if (rank == 0) {
-
+        mpiRank0(fileName, size);
       } else {
-
+        mpiRankAny(rank, threadAmount);
       }
     }
 
   }
 }
 
-void mpiRank0() {
+void mpiRank0(std::string fileName, const int32_t size) {
+  // get jobs
+  std::vector<JobInformation>* jobData =
+      TermalTransferS::getJobData(fileName);
 
+  int32_t* stringSizes = (int32_t*) calloc(2, sizeof(int32_t));
+  double* dataToSend = (double*) calloc(4, sizeof(double));
+
+  int32_t* jobLocationArr = (int32_t*) calloc(jobData->size(), sizeof(int32_t));
+
+  // send data to all process
+  sendData(*jobData, fileName, stringSizes, dataToSend, jobLocationArr);
+
+  // stop processess with stop conditions
+  stopProcessess(stringSizes, size);
+
+  // for all jobs (receive times)
+  for (size_t job = 0; job < jobData->size(); ++job) {
+    // receive time
+    MPI_Recv(&(*jobData)[job].stateAmountRequired, 1,
+    MPI_INT, jobLocationArr[job], 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+  }
+
+  // write report
+   writeReport(*jobData, fileName);
+
+  // erase data
+  TermalTransferS::eraseJobData(jobData);
+  free(jobLocationArr);
 }
 
-void mpiRankAny() {
+void sendData(std::vector<JobInformation>& jobData, std::string& fileName,
+    int32_t* stringSizes, double* dataToSend, int32_t* jobLocationArr) {
+  int32_t rankToSend = -1;
 
+  // for all jobs
+  for (size_t job = 0; job < jobData.size(); ++job) {
+    // receive signal from processes ready to process
+    MPI_Recv(&rankToSend, 1,
+    MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+    jobLocationArr[job] = rankToSend;
+
+    // send sizes of name and extension
+    stringSizes[0] = fileName.size();
+    stringSizes[1] = jobData[job].extension.size();
+
+    MPI_Send(stringSizes, /* amount */2, MPI_INT,
+        rankToSend, 0, MPI_COMM_WORLD);
+
+    // send name
+    MPI_Send(&fileName.c_str()[0], /* amount */stringSizes[0], MPI_INT,
+        rankToSend, 0, MPI_COMM_WORLD);
+
+    // send extension
+    MPI_Send(&(jobData[job].extension.c_str()[0]), /* amount */stringSizes[1],
+     MPI_UNSIGNED_CHAR, rankToSend, 0, MPI_COMM_WORLD);
+
+    // send 4 datas
+    dataToSend[0] = jobData[job].stageTimeDuration;
+    dataToSend[1] = jobData[job].termalDifusivity;
+    dataToSend[2] = jobData[job].cellDimensions;
+    dataToSend[3] = jobData[job].equilibriumPointSentivity;
+    MPI_Send(dataToSend, /* amount */4, MPI_DOUBLE,
+        rankToSend, 0, MPI_COMM_WORLD);
+  }
+}
+
+void stopProcessess(int32_t* stringSizes, const int32_t size) {
+  int32_t rankToSend = -1;
+
+  // for all processess (stop conditions)
+  for (int process = 0; process < size; ++process) {
+    // receive ready to process
+    MPI_Recv(&rankToSend, 1,
+    MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+    // signal there is no more to do (string sizes = 0)
+    stringSizes[0] = 0;
+    stringSizes[1] = 0;
+
+    MPI_Send(&stringSizes[0], /* amount */2, MPI_INT,
+        rankToSend, 0, MPI_COMM_WORLD);
+  }
+}
+
+void mpiRankAny(const int32_t rank, const int32_t threadAmount) {
+  std::vector<JobInformation> jobs;
+
+  int32_t processedJobs = 0;
+
+  int32_t* stringSizes = (int32_t*) calloc(2, sizeof(int32_t));
+  double* jobData = (double*) calloc(4, sizeof(double));
+
+  // while there are jobs
+  while(true) {
+    // receive all data for the job
+    int dataState =
+    receiveData(jobs, processedJobs, stringSizes, jobData, rank);
+
+    // end loop if no more data has been received
+    if (dataState == 1) {
+      break;
+    }
+
+    // process job
+    TermalTransferS::processJob(&jobs[processedJobs], threadAmount);
+
+    processedJobs++;
+  }
+
+  // for all processed jobs
+  for (int job = 0; job < processedJobs; ++job) {
+    // send the time
+    MPI_Send(&jobs[job].stateAmountRequired, /* amount */1, MPI_INT,
+        0, 0, MPI_COMM_WORLD);
+  }
+}
+
+int32_t receiveData(std::vector<JobInformation>& jobs, int32_t& processedJobs,
+    int32_t* stringSizes, double* jobData, const int32_t rank) {
+  // send ready to process
+  MPI_Send(&rank, 1, MPI_INT, /*destination*/ 0, 0, MPI_COMM_WORLD);
+
+  // receive string sizes
+  MPI_Recv(stringSizes, 2,
+    MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+  // if file name size == 0
+  if (stringSizes[0] == 0) {
+    // break cycle, no more to do
+    return 1;
+  }
+  // add new job to the vector
+  jobs.emplace_back(JobInformation());
+
+  // receive fileName
+  std::string fileName(stringSizes[0] + 1, '\0');
+  MPI_Recv(&fileName[0], stringSizes[0],
+    MPI_UNSIGNED_CHAR, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+  jobs[processedJobs].fileName = fileName;
+
+  // receive extension
+  std::string extension(stringSizes[1] + 1, '\0');
+  MPI_Recv(&extension[0], stringSizes[1],
+    MPI_UNSIGNED_CHAR, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+  
+  jobs[processedJobs].extension = extension;
+
+  // receive data
+  MPI_Send(jobData, /* amount */4, MPI_INT,
+      0, 0, MPI_COMM_WORLD);
+
+  jobs[processedJobs].stageTimeDuration = jobData[0];
+  jobs[processedJobs].termalDifusivity = jobData[1];
+  jobs[processedJobs].cellDimensions = jobData[2];
+  jobs[processedJobs].equilibriumPointSentivity = jobData[3];
+
+  return 0;
 }
 
 // returns a vector of jobs found within file from file name
@@ -283,6 +450,7 @@ void TermalTransferS::processJob
 // returns a matrix of the data found in the file data
 void runStage(Matrix<double>& data, Matrix<double>& newData,
 JobInformation* jobInformation, int32_t threadAmount) {
+  (void) threadAmount;
   // get sizes
   size_t rowAmount = data.size(),
       colAmount = data[0].size();

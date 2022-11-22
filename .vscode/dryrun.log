@@ -1,6 +1,0 @@
-make --dry-run --keep-going --print-directory
-make: Entering directory '/home/josephvalverde/proy2_simulacion_de_transferencia_de_calor_concurrente'
- 
-make: Nothing to be done for 'default'.
-make: Leaving directory '/home/josephvalverde/proy2_simulacion_de_transferencia_de_calor_concurrente'
- 
