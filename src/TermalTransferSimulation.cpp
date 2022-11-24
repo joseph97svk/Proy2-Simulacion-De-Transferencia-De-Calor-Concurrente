@@ -59,26 +59,19 @@ void mpiRankAny(const int32_t rank, const int32_t threadAmount);
 int32_t receiveData(std::vector<JobInformation>& jobs, int32_t& processedJobs,
     int32_t* stringSizes, double* jobData, const int32_t rank);
 
+
 /**
- * @brief runs a stage of the simulation
+ * @brief runs a stage of the simulation and
+ * checks how many cell changes break equilibrium
  * 
  * @param data to be processed
  * @param newData where new data will be stored
  * @param jobInformation parameters for processing
+ * @param equilibriumPointSentivity epsilon of change that must not be exceeded
+ * @return int amount of cells breaking equilibrium
  */
-void runStage(Matrix<double>& data, Matrix<double>& newData,
-JobInformation* jobInformation, int32_t threadAmount);
-
-/**
- * @brief checks if equilibrium has been reached according to given parameters
- * 
- * @param data original data
- * @param newData new data
- * @param equilibriumPointSentivity epsilon of max change to be within equilibirum
- * @return true if in equilibrium
- * @return false if not within equilibrium
- */
-bool checkEquilibrium(Matrix<double>& data, Matrix<double>& newData,
+int runStage(Matrix<double>& data, Matrix<double>& newData,
+JobInformation* jobInformation,
 const double equilibriumPointSentivity);
 
 /**
@@ -470,8 +463,11 @@ void TermalTransferS::processJob
 
   bool inEquilibrium = false;
 
+  size_t wrongAmount = 0;
+
   #pragma omp parallel num_threads(threadAmount) \
-    default(none) shared(data, newData, jobInformation, threadAmount, std::cout, stageCount, inEquilibrium)
+    default(none) shared(data, newData, jobInformation, threadAmount,\
+    stageCount, inEquilibrium, wrongAmount)
   {
     // copy all data from previous to new (to account for edges)
     #pragma omp for
@@ -488,19 +484,26 @@ void TermalTransferS::processJob
 
     // while the matrix is not in equilibrium
     while (!localEquilibrium) {
-
-      // run a stage/find state
-      runStage(*data, *newData, jobInformation, threadAmount);
-
-      // check if in equilibrium
-      #pragma omp single
-      inEquilibrium =
-      checkEquilibrium(*data, *newData,
+      // run a stage and receive wrong cell amount
+      int localWrong = runStage(*data, *newData, jobInformation,
       jobInformation->equilibriumPointSentivity);
 
       #pragma omp critical
-      localEquilibrium = inEquilibrium;
+      {
+        wrongAmount += localWrong;
+      }
 
+      #pragma omp barrier
+
+      // check if in equilibrium
+      #pragma omp single
+      inEquilibrium = wrongAmount == 0;
+
+      #pragma omp critical
+      {
+        localEquilibrium = inEquilibrium;
+      }
+      
       // if not in equilibrium
       #pragma omp single
       if (!localEquilibrium) {
@@ -514,11 +517,10 @@ void TermalTransferS::processJob
       #pragma omp single
       {
         stageCount++;
+        wrongAmount = 0;
       }
     }
   }
-
-  std::cout << ">>" << stageCount << std::endl;
 
   jobInformation->stateAmountRequired = stageCount;
 
@@ -528,12 +530,14 @@ void TermalTransferS::processJob
 }
 
 // returns a matrix of the data found in the file data
-void runStage(Matrix<double>& data, Matrix<double>& newData,
-JobInformation* jobInformation, int32_t threadAmount) {
-  (void) threadAmount;
+int runStage(Matrix<double>& data, Matrix<double>& newData,
+JobInformation* jobInformation,
+const double equilibriumPointSentivity) {
   // get sizes
   size_t rowAmount = data.size(),
       colAmount = data[0].size();
+
+  int notInEquilibrium = 0;
 
   // get formula parameters
   double time = jobInformation->stageTimeDuration,
@@ -555,36 +559,21 @@ JobInformation* jobInformation, int32_t threadAmount) {
       // find the new state of the block
       newData[row][col] = data[row][col] +
       (((time * alpha)/dimensions) * sumOfNeightbors);
-    }
-  }
-}
 
-// writes matrix data on binary file
-bool checkEquilibrium(Matrix<double>& data, Matrix<double>& newData,
-const double equilibriumPointSentivity) {
-  // get sizes
-  size_t rowAmount = data.size(),
-      colAmount = data[0].size();
-
-  // for each row
-  for (size_t row = 1; row < rowAmount - 1; ++row) {
-    // for each column
-    for (size_t col = 1; col < colAmount - 1; ++col) {
-      // find the difference
       double difference = data[row][col] - newData[row][col];
       // ensure it is positive
       if (difference < 0) {
         difference = -difference;
       }
+
       // check if it is within epsilom
       if (difference > equilibriumPointSentivity) {
-        return false;
+        notInEquilibrium++;
       }
     }
   }
 
-  // always within epsilom return true
-  return true;
+  return notInEquilibrium;
 }
 
 // returns a matrix of the data found in the file data
