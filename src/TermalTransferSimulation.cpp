@@ -8,20 +8,54 @@ Universidad de Costa Rica. CC BY 4.0 */
 #include <thread>
 #include <mpi.h>
 
-#include <semaphore.h>
-
 #include "TermalTransferSimulation.hpp"
 #include "TermalData.hpp"
 
+/**
+ * @brief administrative process handling task issue and process coordination
+ * 
+ * @param fileName 
+ * @param size 
+ */
 void mpiRank0(std::string fileName, const int32_t size);
 
-void sendData(std::vector<JobInformation>& jobData, std::string& fileName,
-    int32_t* stringSizes, double* dataToSend, int32_t* jobLocationArr);
+/**
+ * @brief sends data to all processes that request it
+ * 
+ * @param jobData vector of all jobs
+ * @param stringSizes sizes of the strings to be sent
+ * @param dataToSend 
+ * @param jobLocationArr 
+ */
+void sendData(std::vector<JobInformation>& jobData, int32_t* stringSizes,
+    double* dataToSend, int32_t* jobLocationArr);
 
+/**
+ * @brief sends stop conditions to stop all processes
+ * @details stop condition is fileName size 0
+ * @param stringSizes sizes of strings
+ * @param size amount of processes
+ */
 void stopProcessess(int32_t* stringSizes, const int32_t size);
 
+/**
+ * @brief worker processes assigned to processing
+ * 
+ * @param rank process number or ID
+ * @param threadAmount amount of desired threads
+ */
 void mpiRankAny(const int32_t rank, const int32_t threadAmount);
 
+/**
+ * @brief Receives data for worker process from administrating process
+ * 
+ * @param jobs vector where jobs will be stored
+ * @param processedJobs amount of jobs already processed
+ * @param stringSizes size of strings to be received
+ * @param jobData buffer where job data is stored before being sent to the job
+ * @param rank process number or ID
+ * @return int32_t 
+ */
 int32_t receiveData(std::vector<JobInformation>& jobs, int32_t& processedJobs,
     int32_t* stringSizes, double* jobData, const int32_t rank);
 
@@ -69,9 +103,12 @@ void TermalTransferS::runTermalTransferSimulation(int& argc, char**& argv) {
     // get file name
     std::string fileName(argv[1]);
 
+    // set default amount of threads
     int32_t threadAmount = std::thread::hardware_concurrency();
 
+    // if thread is given
     if (argc == 3) {
+      // then change it
       threadAmount = std::stoi(argv[2]);
     }
 
@@ -82,10 +119,13 @@ void TermalTransferS::runTermalTransferSimulation(int& argc, char**& argv) {
 
     int rank = 0, size = 0;
 
+    // get the rank of the current process
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     
+    // get the amount of processes
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
+    // if there is just one process
     if (size == 1) {
       // get job data
       std::vector<JobInformation>* jobData =
@@ -97,14 +137,21 @@ void TermalTransferS::runTermalTransferSimulation(int& argc, char**& argv) {
       // erase everything
       TermalTransferS::eraseJobData(jobData);
 
+    // if there are multiple process
     } else {
+      // if rank 0
       if (rank == 0) {
+        // (administrating process)
         mpiRank0(fileName, size);
+      // for all other process
       } else {
+        // (working process)
         mpiRankAny(rank, threadAmount);
       }
     }
 
+    // finalize all process
+    MPI_Finalize();
   }
 }
 
@@ -112,17 +159,24 @@ void mpiRank0(std::string fileName, const int32_t size) {
   // get jobs
   std::vector<JobInformation>* jobData =
       TermalTransferS::getJobData(fileName);
-
+  // allocate space for string size vector
   int32_t* stringSizes = (int32_t*) calloc(2, sizeof(int32_t));
+  // allocate space for the data parameters of each job
   double* dataToSend = (double*) calloc(4, sizeof(double));
-
+  // allocate space for array holding which job is being processed by which process
   int32_t* jobLocationArr = (int32_t*) calloc(jobData->size(), sizeof(int32_t));
 
   // send data to all process
-  sendData(*jobData, fileName, stringSizes, dataToSend, jobLocationArr);
+  sendData(*jobData, stringSizes, dataToSend, jobLocationArr);
 
   // stop processess with stop conditions
   stopProcessess(stringSizes, size);
+
+  // tell other processes to send times
+  for (int process = 1; process < size; ++process) {
+    MPI_Send(&process, /* amount */1, MPI_INT,
+        process, 0, MPI_COMM_WORLD);
+  }
 
   // for all jobs (receive times)
   for (size_t job = 0; job < jobData->size(); ++job) {
@@ -132,16 +186,18 @@ void mpiRank0(std::string fileName, const int32_t size) {
   }
 
   // write report
-   writeReport(*jobData, fileName);
+  writeReport(*jobData, fileName);
 
   // erase data
   TermalTransferS::eraseJobData(jobData);
   free(jobLocationArr);
 }
 
-void sendData(std::vector<JobInformation>& jobData, std::string& fileName,
-    int32_t* stringSizes, double* dataToSend, int32_t* jobLocationArr) {
+void sendData(std::vector<JobInformation>& jobData, int32_t* stringSizes,
+    double* dataToSend, int32_t* jobLocationArr) {
   int32_t rankToSend = -1;
+  // get size of extension, it is shared among all
+  stringSizes[1] = jobData[0].extension.size();
 
   // for all jobs
   for (size_t job = 0; job < jobData.size(); ++job) {
@@ -152,14 +208,12 @@ void sendData(std::vector<JobInformation>& jobData, std::string& fileName,
     jobLocationArr[job] = rankToSend;
 
     // send sizes of name and extension
-    stringSizes[0] = fileName.size();
-    stringSizes[1] = jobData[job].extension.size();
-
+    stringSizes[0] = jobData[job].fileName.size();
     MPI_Send(stringSizes, /* amount */2, MPI_INT,
         rankToSend, 0, MPI_COMM_WORLD);
 
     // send name
-    MPI_Send(&fileName.c_str()[0], /* amount */stringSizes[0], MPI_INT,
+    MPI_Send(&jobData[job].fileName.c_str()[0], /* amount */stringSizes[0], MPI_UNSIGNED_CHAR,
         rankToSend, 0, MPI_COMM_WORLD);
 
     // send extension
@@ -171,6 +225,7 @@ void sendData(std::vector<JobInformation>& jobData, std::string& fileName,
     dataToSend[1] = jobData[job].termalDifusivity;
     dataToSend[2] = jobData[job].cellDimensions;
     dataToSend[3] = jobData[job].equilibriumPointSentivity;
+
     MPI_Send(dataToSend, /* amount */4, MPI_DOUBLE,
         rankToSend, 0, MPI_COMM_WORLD);
   }
@@ -180,7 +235,7 @@ void stopProcessess(int32_t* stringSizes, const int32_t size) {
   int32_t rankToSend = -1;
 
   // for all processess (stop conditions)
-  for (int process = 0; process < size; ++process) {
+  for (int process = 0; process < size - 1; ++process) {
     // receive ready to process
     MPI_Recv(&rankToSend, 1,
     MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
@@ -198,8 +253,9 @@ void mpiRankAny(const int32_t rank, const int32_t threadAmount) {
   std::vector<JobInformation> jobs;
 
   int32_t processedJobs = 0;
-
+  // buffer to sizes of file name and extension to be received
   int32_t* stringSizes = (int32_t*) calloc(2, sizeof(int32_t));
+  // buffer for received job data
   double* jobData = (double*) calloc(4, sizeof(double));
 
   // while there are jobs
@@ -219,16 +275,26 @@ void mpiRankAny(const int32_t rank, const int32_t threadAmount) {
     processedJobs++;
   }
 
+  // wait until told to continue
+  int buffer = 0;
+  MPI_Recv(&buffer, 1,
+    MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+  // std::cout << rank << " done processing: " << processedJobs << std::endl;
   // for all processed jobs
   for (int job = 0; job < processedJobs; ++job) {
     // send the time
     MPI_Send(&jobs[job].stateAmountRequired, /* amount */1, MPI_INT,
         0, 0, MPI_COMM_WORLD);
   }
+
+  free(stringSizes);
+  free(jobData);
 }
 
 int32_t receiveData(std::vector<JobInformation>& jobs, int32_t& processedJobs,
     int32_t* stringSizes, double* jobData, const int32_t rank) {
+
   // send ready to process
   MPI_Send(&rank, 1, MPI_INT, /*destination*/ 0, 0, MPI_COMM_WORLD);
 
@@ -245,22 +311,22 @@ int32_t receiveData(std::vector<JobInformation>& jobs, int32_t& processedJobs,
   jobs.emplace_back(JobInformation());
 
   // receive fileName
-  std::string fileName(stringSizes[0] + 1, '\0');
+  std::string fileName(stringSizes[0], '\0');
   MPI_Recv(&fileName[0], stringSizes[0],
     MPI_UNSIGNED_CHAR, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-
+  
   jobs[processedJobs].fileName = fileName;
 
   // receive extension
-  std::string extension(stringSizes[1] + 1, '\0');
+  std::string extension(stringSizes[1], '\0');
   MPI_Recv(&extension[0], stringSizes[1],
     MPI_UNSIGNED_CHAR, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-  
+
   jobs[processedJobs].extension = extension;
 
   // receive data
-  MPI_Send(jobData, /* amount */4, MPI_INT,
-      0, 0, MPI_COMM_WORLD);
+  MPI_Recv(jobData, /* amount */4, MPI_DOUBLE,
+      0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
   jobs[processedJobs].stageTimeDuration = jobData[0];
   jobs[processedJobs].termalDifusivity = jobData[1];
@@ -336,15 +402,15 @@ std::vector<JobInformation>* TermalTransferS::getJobData
         break;
     }
 
+    // place the same extension on all JobInformations
+    (*dataVector)[jobsFoundAmount].extension = extension;
+
     dataPosition++;
 
     // advance to next job if all current data already placed
     if (dataPosition == 5) {
       jobsFoundAmount++;
       dataPosition = 0;
-
-      // place the same extension on all JobInformations
-      (*dataVector)[jobsFoundAmount].extension = extension;
     }
   }
 
@@ -392,7 +458,6 @@ void debugMatrix(Matrix<double>& matrix) {
 // processess the given job
 void TermalTransferS::processJob
     (JobInformation* jobInformation, int32_t threadAmount) {
-
   // get the matrix out of the file
   Matrix<double>* data = getMatrix(jobInformation);
 
@@ -401,44 +466,59 @@ void TermalTransferS::processJob
 
   newData->resize(data->size());
 
-  // copy all data from previous to new (to account for edges)
-  for (size_t row = 0; row < newData->size(); ++row) {
-    (*newData)[row].resize((*data)[0].size());
-    for (size_t col = 0; col < (*newData)[row].size(); ++col) {
-      (*newData)[row][col] =
-      (*data)[row][col];
-    }
-  }
+  size_t stageCount = 0;
 
   bool inEquilibrium = false;
 
-  int stageCount = 0;
+  #pragma omp parallel num_threads(threadAmount) \
+    default(none) shared(data, newData, jobInformation, threadAmount, std::cout, stageCount, inEquilibrium)
+  {
+    // copy all data from previous to new (to account for edges)
+    #pragma omp for
+    for (size_t row = 0; row < newData->size(); ++row) {
+      (*newData)[row].resize((*data)[0].size());
 
-  // while the matrix is not in equilibrium
-  while (!inEquilibrium) {
-    // run a stage/find state
-    #pragma omp parallel num_threads(threadAmount) \
-    default(none) shared(data, newData, jobInformation, threadAmount)
-    {
+      // each thread takes a row at a time
+      for (size_t col = 0; col < (*newData)[row].size(); ++col) {
+        (*newData)[row][col] = (*data)[row][col];
+      }
+    }
+
+    bool localEquilibrium = false;
+
+    // while the matrix is not in equilibrium
+    while (!localEquilibrium) {
+
+      // run a stage/find state
       runStage(*data, *newData, jobInformation, threadAmount);
-    }
-    
-    // check if in equilibrium
-    inEquilibrium =
-    checkEquilibrium(*data, *newData,
-    jobInformation->equilibriumPointSentivity);
 
-    // if not in equilibrium
-    if (!inEquilibrium) {
-      /* swap matrixes (data will always have old data)
-       * old data will be overwritten and lost within the matrixes
-      */
-      std::swap(data, newData);
-    }
+      // check if in equilibrium
+      #pragma omp single
+      inEquilibrium =
+      checkEquilibrium(*data, *newData,
+      jobInformation->equilibriumPointSentivity);
 
-    // increase stages processed
-    stageCount++;
+      #pragma omp critical
+      localEquilibrium = inEquilibrium;
+
+      // if not in equilibrium
+      #pragma omp single
+      if (!localEquilibrium) {
+        /* swap matrixes (data will always have old data)
+        * old data will be overwritten and lost within the matrixes
+        */
+        std::swap(data, newData);
+      }
+
+      // increase stages processed and reset coincidence amount
+      #pragma omp single
+      {
+        stageCount++;
+      }
+    }
   }
+
+  std::cout << ">>" << stageCount << std::endl;
 
   jobInformation->stateAmountRequired = stageCount;
 
@@ -464,7 +544,7 @@ JobInformation* jobInformation, int32_t threadAmount) {
   // for each row
   #pragma omp for
   for (size_t row = 1; row < rowAmount - 1; ++row) {
-    // for each column
+    // for each column (each thread gets a row at a time)
     for (size_t col = 1; col < colAmount - 1; ++col) {
       // find the sum of neighbors
       double sumOfNeightbors =
@@ -502,6 +582,7 @@ const double equilibriumPointSentivity) {
       }
     }
   }
+
   // always within epsilom return true
   return true;
 }
@@ -509,7 +590,7 @@ const double equilibriumPointSentivity) {
 // returns a matrix of the data found in the file data
 Matrix<double>* TermalTransferS::getMatrix(JobInformation* jobInformation) {
   // get complete path with file name
-  std::string fileName = "jobs/" + jobInformation->fileName;
+  std::string fileName = jobInformation->extension + jobInformation->fileName;
 
   // open binary file
   std::ifstream file;
