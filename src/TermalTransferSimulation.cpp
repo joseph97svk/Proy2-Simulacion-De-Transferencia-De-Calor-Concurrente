@@ -4,12 +4,16 @@ Universidad de Costa Rica. CC BY 4.0 */
 #include <utility>
 #include <ctime>
 #include <iomanip>
-#include <omp.h>
+#include <omp.h>  // NOLINT
 #include <thread>
-#include <mpi.h>
+#include <mpi.h>  // NOLINT
+#include <stdexcept>
 
 #include "TermalTransferSimulation.hpp"
 #include "TermalData.hpp"
+
+#define CAST(type, unit)\
+  reinterpret_cast<type>(unit)
 
 /**
  * @brief administrative process handling task issue and process coordination
@@ -59,7 +63,6 @@ void mpiRankAny(const int32_t rank, const int32_t threadAmount);
 int32_t receiveData(std::vector<JobInformation>& jobs, int32_t& processedJobs,
     int32_t* stringSizes, double* jobData, const int32_t rank);
 
-
 /**
  * @brief runs a stage of the simulation and
  * checks how many cell changes break equilibrium
@@ -71,8 +74,7 @@ int32_t receiveData(std::vector<JobInformation>& jobs, int32_t& processedJobs,
  * @return int amount of cells breaking equilibrium
  */
 int runStage(Matrix<double>& data, Matrix<double>& newData,
-JobInformation* jobInformation,
-const double equilibriumPointSentivity);
+    JobInformation* jobInformation, const double equilibriumPointSentivity);
 
 /**
  * @brief writes report of all simulations
@@ -80,7 +82,8 @@ const double equilibriumPointSentivity);
  * @param jobsInformation information on all jobs
  * @param fileName name of file where all jobs were listed
  */
-void writeReport(std::vector<JobInformation>& jobsInformation, std::string fileName);
+void writeReport(std::vector<JobInformation>& jobsInformation,
+    std::string fileName);
 
 /**
  * @brief gets the time formated as string
@@ -107,16 +110,20 @@ void TermalTransferS::runTermalTransferSimulation(int& argc, char**& argv) {
 
     // Initiate mpi connection environment
     if (MPI_Init(&argc, &argv) != MPI_SUCCESS) {
-      return;
+      throw std::runtime_error("Could not initialize MPI enviroment");
     }
 
     int rank = 0, size = 0;
 
     // get the rank of the current process
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    
+    if (MPI_Comm_rank(MPI_COMM_WORLD, &rank) != EXIT_SUCCESS) {
+      throw std::runtime_error("Could not get process rank");
+    }
+
     // get the amount of processes
-    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    if (MPI_Comm_size(MPI_COMM_WORLD, &size) != EXIT_SUCCESS) {
+      throw std::runtime_error("Could not get process amount");
+    }
 
     // if there is just one process
     if (size == 1) {
@@ -153,11 +160,28 @@ void mpiRank0(std::string fileName, const int32_t size) {
   std::vector<JobInformation>* jobData =
       TermalTransferS::getJobData(fileName);
   // allocate space for string size vector
-  int32_t* stringSizes = (int32_t*) calloc(2, sizeof(int32_t));
+  int32_t* stringSizes = CAST(int32_t*, calloc(2, sizeof(int32_t)));
+  if (stringSizes == nullptr) {
+    throw std::runtime_error
+        ("Could not allocate outbound string size memory");
+  }
+
   // allocate space for the data parameters of each job
-  double* dataToSend = (double*) calloc(4, sizeof(double));
-  // allocate space for array holding which job is being processed by which process
-  int32_t* jobLocationArr = (int32_t*) calloc(jobData->size(), sizeof(int32_t));
+  double* dataToSend = CAST(double*, calloc(4, sizeof(double)));
+  if (dataToSend == nullptr) {
+    throw std::runtime_error
+        ("Could not allocate outbound job data memory");
+  }
+
+  /* allocate space for array holding which job
+   * is being processed by which process
+  */
+  int32_t* jobLocationArr =
+      CAST(int32_t*, calloc(jobData->size(), sizeof(int32_t)));
+  if (jobLocationArr == nullptr) {
+    throw std::runtime_error
+        ("Could not allocate job process location mapping memory");
+  }
 
   // send data to all process
   sendData(*jobData, stringSizes, dataToSend, jobLocationArr);
@@ -198,6 +222,7 @@ void sendData(std::vector<JobInformation>& jobData, int32_t* stringSizes,
     MPI_Recv(&rankToSend, 1,
     MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
+    // set rank that is processing job in the array for data receive ordering
     jobLocationArr[job] = rankToSend;
 
     // send sizes of name and extension
@@ -206,8 +231,8 @@ void sendData(std::vector<JobInformation>& jobData, int32_t* stringSizes,
         rankToSend, 0, MPI_COMM_WORLD);
 
     // send name
-    MPI_Send(&jobData[job].fileName.c_str()[0], /* amount */stringSizes[0], MPI_UNSIGNED_CHAR,
-        rankToSend, 0, MPI_COMM_WORLD);
+    MPI_Send(&jobData[job].fileName.c_str()[0], /* amount */stringSizes[0],
+        MPI_UNSIGNED_CHAR, rankToSend, 0, MPI_COMM_WORLD);
 
     // send extension
     MPI_Send(&(jobData[job].extension.c_str()[0]), /* amount */stringSizes[1],
@@ -247,12 +272,20 @@ void mpiRankAny(const int32_t rank, const int32_t threadAmount) {
 
   int32_t processedJobs = 0;
   // buffer to sizes of file name and extension to be received
-  int32_t* stringSizes = (int32_t*) calloc(2, sizeof(int32_t));
+  int32_t* stringSizes = CAST(int32_t*, calloc(2, sizeof(int32_t)));
+  if (stringSizes == nullptr) {
+    throw std::runtime_error("Could not allocate receival string size memory");
+  }
+
   // buffer for received job data
-  double* jobData = (double*) calloc(4, sizeof(double));
+  double* jobData = CAST(double*, calloc(4, sizeof(double)));
+  if (jobData == nullptr) {
+    throw std::runtime_error
+        ("Could not allocate job data receival buffer memory");
+  }
 
   // while there are jobs
-  while(true) {
+  while (true) {
     // receive all data for the job
     int dataState =
     receiveData(jobs, processedJobs, stringSizes, jobData, rank);
@@ -273,7 +306,6 @@ void mpiRankAny(const int32_t rank, const int32_t threadAmount) {
   MPI_Recv(&buffer, 1,
     MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
-  // std::cout << rank << " done processing: " << processedJobs << std::endl;
   // for all processed jobs
   for (int job = 0; job < processedJobs; ++job) {
     // send the time
@@ -281,6 +313,7 @@ void mpiRankAny(const int32_t rank, const int32_t threadAmount) {
         0, 0, MPI_COMM_WORLD);
   }
 
+  // free all allocated memory
   free(stringSizes);
   free(jobData);
 }
@@ -307,7 +340,7 @@ int32_t receiveData(std::vector<JobInformation>& jobs, int32_t& processedJobs,
   std::string fileName(stringSizes[0], '\0');
   MPI_Recv(&fileName[0], stringSizes[0],
     MPI_UNSIGNED_CHAR, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-  
+
   jobs[processedJobs].fileName = fileName;
 
   // receive extension
@@ -338,6 +371,10 @@ std::vector<JobInformation>* TermalTransferS::getJobData
   // open file
   std::ifstream file;
   file.open(fileName);
+
+  if (!file.is_open()) {
+    throw std::runtime_error("Could not open txt file with job info");
+  }
 
   std::string extension;
 
@@ -424,28 +461,8 @@ void TermalTransferS::processAllJobs(std::vector<JobInformation>* jobs,
     processJob(&(*jobs)[currentJob], threadAmount);
   }
 
+  // write tsv report
   writeReport(*jobs, fileName);
-}
-
-/**
- * @brief prints matrix on console
- * 
- * @param matrix to be printed
- */
-void debugMatrix(Matrix<double>& matrix) {
-  size_t rowAmount = matrix.size(),
-      colAmount = matrix[0].size();
-
-  std::cout << rowAmount << "," << colAmount << std::endl;
-
-  for (size_t row = 0; row < rowAmount; ++row) {
-    for (size_t col = 0; col < colAmount; ++col) {
-      std::cout << matrix[row][col] << " ";
-    }
-    std::cout << std::endl;
-  }
-
-  std::cout << std::endl;
 }
 
 // processess the given job
@@ -456,19 +473,15 @@ void TermalTransferS::processJob
 
   // set a new matrix for new data
   Matrix<double>* newData = new Matrix<double>;
-
   newData->resize(data->size());
 
-  size_t stageCount = 0;
-
+  size_t stageCount = 0, wrongAmount = 0;
   bool inEquilibrium = false;
 
-  size_t wrongAmount = 0;
-
   #pragma omp parallel num_threads(threadAmount) \
-    default(none) shared(data, newData, jobInformation, threadAmount,\
+    default(none) shared(data, newData, jobInformation, \
     stageCount, inEquilibrium, wrongAmount)
-  {
+  {  // NOLINT
     // copy all data from previous to new (to account for edges)
     #pragma omp for
     for (size_t row = 0; row < newData->size(); ++row) {
@@ -488,22 +501,25 @@ void TermalTransferS::processJob
       int localWrong = runStage(*data, *newData, jobInformation,
       jobInformation->equilibriumPointSentivity);
 
+      // aggregate all non-equilibrium cells from all threads
       #pragma omp critical
       {
         wrongAmount += localWrong;
       }
 
+      // wait for all threads to report on their non-equilibrium cells
       #pragma omp barrier
 
       // check if in equilibrium
       #pragma omp single
       inEquilibrium = wrongAmount == 0;
 
+      // set shared as local equilibrium
       #pragma omp critical
       {
         localEquilibrium = inEquilibrium;
       }
-      
+
       // if not in equilibrium
       #pragma omp single
       if (!localEquilibrium) {
@@ -660,13 +676,18 @@ void TermalTransferS::eraseJobData(std::vector<JobInformation>* jobData) {
   delete(jobData);
 }
 
-void writeReport(std::vector<JobInformation>& jobsInformation, std::string fileName) {
+void writeReport(std::vector<JobInformation>& jobsInformation,
+    std::string fileName) {
   // open file
   std::ifstream file;
   file.open(fileName);
 
+  if (!file.is_open()) {
+    throw std::runtime_error("Could not open file to write report");
+  }
+
   std::string newFileName = jobsInformation[0].extension +
-      fileName.substr(0, fileName.size() - 4) +".tsv";;
+      fileName.substr(0, fileName.size() - 4) + ".tsv";;
 
   // create binary file
   std::ofstream newFile(newFileName, std::ios::binary);
@@ -687,12 +708,14 @@ void writeReport(std::vector<JobInformation>& jobsInformation, std::string fileN
     newFile << "\n";
     ++job;
   }
+
+  // close all files
   file.close();
   newFile.close();
 }
 
+// gets the time formated as string
 static std::string format_time(const time_t seconds) {
-  // TODO(any): Using C until C++20 std::format() is implemented by compilers
   char text[48];  // YYYY/MM/DD hh:mm:ss
   const std::tm& gmt = * std::gmtime(&seconds);
   snprintf(text, sizeof(text), "%04d/%02d/%02d\t%02d:%02d:%02d", gmt.tm_year
