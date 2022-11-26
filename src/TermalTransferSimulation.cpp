@@ -686,7 +686,7 @@ void writeReport(std::vector<JobInformation>& jobsInformation,
     throw std::runtime_error("Could not open file to write report");
   }
 
-  std::string newFileName = jobsInformation[0].extension +
+  std::string newFileName =
       fileName.substr(0, fileName.size() - 4) + ".tsv";;
 
   // create binary file
@@ -699,11 +699,18 @@ void writeReport(std::vector<JobInformation>& jobsInformation,
   while (getline(file, current)) {
     // write it to the new file
     newFile << current;
+
     // get the time
     double totalTime = jobsInformation[job].stageTimeDuration *
     jobsInformation[job].stateAmountRequired;
+    
+    // add stage amount
+    newFile << std::setfill(' ') << std::setw(20) <<
+    jobsInformation[job].stateAmountRequired << " ";
+
     // add time information
     newFile << std::setfill(' ') << std::setw(30) << format_time(totalTime);
+
     // next line
     newFile << "\n";
     ++job;
