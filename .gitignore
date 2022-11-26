@@ -3,3 +3,6 @@ doc
 bin
 build
 thumbs.db
+.bin
+.out
+.tsv

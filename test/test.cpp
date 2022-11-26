@@ -2,6 +2,7 @@
 #include <iomanip>
 #include <iostream>
 #include <fstream>
+#include <vector>
 
 template <typename dataType>
 using Matrix = std::vector<std::vector<dataType>>;
@@ -13,19 +14,21 @@ bool compareMatrixes(Matrix<double>& matrixA,
 
 int main (int argc, char* argv[]) {
   if (argc != 4) {
-    std::cout << "wrong amount of arguments given!" << std::endl;
+    std::cout << "Wrong amount of arguments given!" << std::endl;
+    return EXIT_FAILURE;
   }
 
+  // get file names
   std::string fileNameA = argv[1];
-
   std::string fileNameB = argv[2];
 
   double epsilon = std::stod(argv[3]);
 
+  // extract matrixes from files
   Matrix<double>* matrixA = getMatrix(fileNameA);
-
   Matrix<double>* matrixB = getMatrix(fileNameB);
-
+  
+  // compare matrixes
   if (compareMatrixes(*matrixA, *matrixB, epsilon)) {
     std::cout << "All good!" << std::endl;
   }

@@ -678,46 +678,38 @@ void TermalTransferS::eraseJobData(std::vector<JobInformation>* jobData) {
 
 void writeReport(std::vector<JobInformation>& jobsInformation,
     std::string fileName) {
-  // open file
-  std::ifstream file;
-  file.open(fileName);
-
-  if (!file.is_open()) {
-    throw std::runtime_error("Could not open file to write report");
-  }
-
   std::string newFileName =
       fileName.substr(0, fileName.size() - 4) + ".tsv";;
 
   // create binary file
-  std::ofstream newFile(newFileName, std::ios::binary);
+  std::ofstream newFile(newFileName);
 
-  std::string current;
-
-  int job = 0;
-  // for each line read
-  while (getline(file, current)) {
-    // write it to the new file
-    newFile << current;
+  size_t job = 0;
+  // for each job
+  while (job < jobsInformation.size()) {
+    // write the parameters given
+    newFile << jobsInformation[job].fileName
+        << "\t" << jobsInformation[job].stageTimeDuration
+        << "\t" << jobsInformation[job].termalDifusivity
+        << "\t" << jobsInformation[job].cellDimensions
+        << "\t" << jobsInformation[job].equilibriumPointSentivity;
 
     // get the time
     double totalTime = jobsInformation[job].stageTimeDuration *
     jobsInformation[job].stateAmountRequired;
-    
+
     // add stage amount
-    newFile << std::setfill(' ') << std::setw(20) <<
-    jobsInformation[job].stateAmountRequired << " ";
+    newFile << "\t" <<
+    jobsInformation[job].stateAmountRequired;
 
     // add time information
-    newFile << std::setfill(' ') << std::setw(30) << format_time(totalTime);
+    newFile << "\t" << format_time(totalTime);
 
     // next line
     newFile << "\n";
     ++job;
   }
 
-  // close all files
-  file.close();
   newFile.close();
 }
 
