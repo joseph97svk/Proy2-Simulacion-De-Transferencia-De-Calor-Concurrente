@@ -663,6 +663,8 @@ void TermalTransferS::writeMatrixOnFile(Matrix<double>& dataMatrix,
         (&dataMatrix[row][0]), (sizeof(double) * (colAmount)));
   }
 
+  std::cout << "File: " << newFileName << " written!" << std::endl;
+
   // delete matrix
   delete(&dataMatrix);
 
