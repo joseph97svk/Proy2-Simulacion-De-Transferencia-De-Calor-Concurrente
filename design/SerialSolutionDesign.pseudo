@@ -1,4 +1,5 @@
 struct JobInformation 
+
   string fileName
   string extension
   double stageDuration
@@ -8,67 +9,59 @@ struct JobInformation
   int stateAmountRequired
 
 runTermalTransferSimulation() {
+
   jobData := getJobData(fileName)
-
   processAllJobs(jobData)
-
   erase all job data
+
 }
 
 getJobData() {
+
   create vector for jobs
-
   open txt file with job info
-
   find where the extension ends
-
   get the extension out of the file name
 
   while (data can be extracted from the file)
     place a JobInformation on the vector
-
     place data on the jobInformation
-
     place the same extension on all JobInformations
-
     advance to next job if all current data already placed
-
+  
   close file
 }
 
 processAllJobs() {
+
   for all jobs
     processJob(current job)
 
   writeReport()
+
 }
 
 processJob() {
+
   get matrix out of binary file
-
   set a new matrix for new data
-
   copy all data from previous to new (to account for edges)
 
   while (the matrix is not in equilibrium)
     not in equilibrium amount := runStage()
-
     check if in equilibrium
-
     swap matrixes (data will always have old data)
-
     increase stages processed and reset not in equilibrium cell amount
 
   write results on new file
+
 }
 
 getMatrix() {
+
   get complete path with file name
-  
   open binary file
-
   read matrix cellDimensions
-
   make new matrix
   
   for each row
@@ -77,15 +70,14 @@ getMatrix() {
   close file
 
   return matrix
+
 }
 
 writeMatrixOnFile() {
+
   get dimensions
-
   get new file name
-  
   create binary file
-
   write matrix dimensions on file
 
   for each row
@@ -94,17 +86,14 @@ writeMatrixOnFile() {
   close file
 }
 
-runStage()
+runStage() {
   get sizes
-
   get formula parameters
 
   for each row
     for each column
       find the sum of neighbors
-
       find the new state of the block
-
       get difference between new and old data
 
       if it is not within epsilom
@@ -112,19 +101,21 @@ runStage()
 
   return not in equilibrium amount
 
-writeReport() {
-  open original txt file
+}
 
+  
+
+writeReport() {
+
+  open original txt file
   create new report file
   
   for each line read
     write it to the new file
-
     get the time
-
     add time information
-
     add next line
 
   close all files
+
 }

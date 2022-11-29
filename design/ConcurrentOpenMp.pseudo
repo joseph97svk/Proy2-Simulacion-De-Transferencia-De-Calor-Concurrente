@@ -1,21 +1,19 @@
 runTermalTransferSimulation() {
-  get file name
 
+  get file name
   set default amount of threads
 
   if thread is given
     then change it
 
   jobData := getJobData(fileName)
-
   processAllJobs(jobData)
-
   erase all job data
 }
 
 processJob() {
+
   get the matrix out of the file
-  
   set a new matrix for new data
 
   initiate threads
@@ -24,28 +22,22 @@ processJob() {
 
     while not in equilibrium
       not in equilibrium amount := runStage()
-
       local nonEquilibriumAmount = local nonEquilibriumAmount + shared nonEquilibriumAmount
-
       wait on barrier for all threads to report on their non-equilibrium cells
-
       check if in equilibrium in just one thread
-
       set shared equilibrium as local equilibrium
-
         if not in equilibrium 
           swap matrixes in just one thread
-        
-      increase stages processed and reset coincidence amount in just one single thread 
+      increase stages processed and reset coincidence amount in just one single thread
+
 }
 
 runStage() {
+
   for each row
     distribute rows between threads
       find the sum of neighbors
-
       find the new state of the block
-
       get difference between new and old data
 
       if it is not within epsilom

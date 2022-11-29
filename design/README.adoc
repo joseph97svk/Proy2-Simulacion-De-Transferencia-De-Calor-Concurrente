@@ -1,0 +1,39 @@
+= Design =
+
+== Serial Solution ==
+
+The serial part of the design consists in the extraction of the data, the processing of the data and finally its storage and report production. A txt first is read from where all jobs are extracted. For each job, the name, and the parameters are extracted and added to a JobInformation struct where the extension of the original file is also added. All jobs are added to a vector. 
+
+Once all jobs are extracted, all jobs are then processed. At each job the matrix is extracted from the bin file where the plate is stored. For each job, it is desired to know the state and the amount of stages necessary to get to such state under equilibrium. As such while it is not in equilibrium, it will continue running a stage. At each stage processing the matrix is traveled, where each cell gets its new temperature value calculated and checks how many cells are not in equilibrium. The while loop stops once this amount of cells reaches 0.
+
+Once the plate is in equilibrium, the state is stored in a binary file. Once all jobs are finished, all values for the time taken are then written on a report file. 
+
+=== Pseudocode ===
+
+include::SerialSolutionDesign.pseudo[]
+
+== OpenMp Concurrent Solution ==
+
+For the thread concurrency of this proyect, it was chosen to parallelize the calculation of the plates. The main area responsible for the time taken of the program was determined to be in the calculation of a new state for the plate. This calculations require the traversing of a matrix. Because each row is loaded as an array and as such loaded by processor into the cache, the unit of descomposition chosen was the rows of the matrix. As such, rows are distributed to the threads which then process the rows.
+
+Each thread then processes the rows' new state and also find the amount of cells not in equilibrium. Because of this, once the new matrix state has been calculated, these amounts of cells not inequilibrium from all cells are added. All threads wait until the total is found. This total is then used to find out if all threads are to continue working or if the state of the plate is final and as such move forward to the following tasks according to the parallel solution.  
+
+=== Pseudocode ===
+
+include::ConcurrentOpenMp.pseudo[]
+
+== MPI Distributed Solution ==
+
+For the MPI implementation, it was chosen to distribute the calculation of the jobs given in the txt file. This means, jobs are distributed between the processes and are the unit of descomposition for this implementation. In the case there is only one process, the route taken will be the same as in the previous implementations. Given more than 1 job, process 0 reads the txt file with the jobs, distributes the jobs between all other processes and then once all processes are done with the assigned jobs, writes the report. 
+
+For the distribution of jobs, process 0 waits until any of the other processes reports that they are ready to process a job. Because jobs are distributed to the first process to be ready, this is a implementation of dynamic mapping. Once this is done, it sends the sizes of the name and the extensions it will send, so that the other process knows the size of the information to receive. It then proceeds to send such name and extension of the job to be done. Next it sends the data parameters necessary for the processing of the job. 
+
+Once all jobs have been processed, it will signal all processes to stop by sending a stop condition, that being that the sizes of the name and extension are 0. With this, it will then signal all processes to send all their time informations and with this writes the report.
+
+For all other processes, it will, while there are jobs, signal its ready to process a job by sending its rank, it will then receive the sizes of strings. If the sizes are 0, it will know there are no more jobs to process and stop the cycle. Else, it will then use these sizes to allocate the space and know the sizes to receive the name and extension of the job. Once this is done, it will receive the parameters and process the job. 
+
+Once all jobs are done for each process, it will wait until signaled by process 0 to send the times of the jobs processed. Once these are done, the live of the process can reach its end. All other elements of the processing pipeline remain the same. 
+
+=== Pseudocode ===
+
+include::ConcurrentMPI.pseudo[]

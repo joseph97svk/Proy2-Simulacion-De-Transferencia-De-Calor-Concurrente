@@ -36,7 +36,7 @@ For the first part or milestone of this project the following are expected:
 
 ==== Part 2 ====
 
-This part or milestone of the project is to have concurrent solution utilizing both threading concurrency as well as process concurrency utilizing both OpenMP as well MPI technologies.
+This part or milestone of the project is to have concurrent and distributed solution utilizing both threading concurrency as well as process concurrency utilizing both OpenMP as well MPI technologies.
 
 For the second part or milestone of this project the following are expected:
 
@@ -70,6 +70,8 @@ For the execution of the program using multiple processes with the MPI technolog
 
 Where the thread number is, once again, optional. 
 
+The distributed tasks for each process are the jobs found in the txt file. As such this is only useful for the execution of several jobs, this is specially useful for heavy and complicated jobs distributed within a cluster. 
+
 ==== Using single process MPI technology ====
 
 It is also possible to run using the MPI technology but with a single process. As odd as it may sound, depending on the device and software configurations this may lead to either better or worse performance, so it may be up to the user to test the right configuration to run. This may be run using the following:
@@ -77,9 +79,72 @@ It is also possible to run using the MPI technology but with a single process. A
 - `mpiexec -np 1 bin/proy2_simulacion_de_transferencia_de_calor_concurrente jobs/job001.txt [thread_number]`
 
 
+==== Further on MPI use ====
+
+It is important to have a configuration file for the use of MPI. The lack of thereof will result in the use of the computer in use for all processes given as parameter. Given the use of a configuration file, it is important to task first the master node with 1 process, such that the main process will run on this node. This is important given that this process will only distribute jobs. All other processes process the jobs' heavy calculations. It is assumed that the master is the weakest or most used node and as such it is not desired for it to process the calculation themselves. 
+
+==== On file locations ====
+
+It is important to note, that this program will asume that all jobs, that meaning the bin files containing the respective plate matrixes, are in the same folder as the txt file listing them. The solutions and the report will also be written on the same folder. If these files are, otherwise, in another location, the program will not find them and report the error. 
+
+
+==== Testing software ====
+
+There is a program to test wether the resulting plates are within the parameters of expected. Given a file containing the expected information, and another produced by the main program, it is possible to test if the last coincides with the first. For this both files are given, and then as the last argument the maximum tolerance of error between both. Given all cells are within tolerance, the program will report success. Otherwise, it will report the first ocurrance of this error and the positions.
+
+Its exection is as following:
+
+`file_location/test original_plate.bin plate_to_test.bin [error_tolerance]` 
+
+for example:
+
+`tests/bin/test plate001-2_original.bin plate001-2.bin 0.0001`
+
 === Perfomance Analisis ===
 
-Performance analisis here
+For the perfomance analisis, the final version of the program implementing all, the serial, OpenMp, & MPI versions, was used. In order to test the serial version, it was tested using 1 process and 1 thread according to the argument use on program execution. For the OpenMP parallel testing, it was tested using 1 process and the amount of cores supported by the system according to the argument use on program execution. 
+
+For the MPI concurrent testing, 4 processes were run in the cluster across 4 nodes; 1 master and 3 slaves, were process 0 was run on the master and the worker processes on the slave nodes. This last, once again according to the argument use on program execution. All tests were performed on the Arenal cluster. The first two tests were run on a single slave node. The serial version on node 1 and the concurrent version on node 0.
+
+All performance tests are done using 'perf stat' to measure the time taken in seconds.
+
+The following table and graphs are to be used for both stages of this performance analisis. 
+
+[#img-PerformaceTestingResultsTable.png]
+image::PerformanceAnalisis/PerformaceTestingResultsTable.png[]
+
+Table 1. Table on the time, speedup, efficiency and core amount (resources) for each execution testing. 
+
+[#img-TimeSpeedUpChart.png]
+image::PerformanceAnalisis/TimeSpeedUpChart.png[]
+
+Chart 1. Chart comparing the time taken and speedup for each execution testing. 
+
+[#img-SpeedUpEfficiencyChart.png]
+image::PerformanceAnalisis/SpeedUpEfficiencyChart.png[]
+
+Chart 2. Chart comparing the speedup and the efficiency of each execution testing.
+
+==== Concurrent Simulation ====
+
+For this comparison, we will only considering the first two tests, the serial and concurrent with 1 process and 8 threads in one node. 
+
+The first thing to consider is the massive uplift in performance, going from around 26 hours down to nearly 4 hours. This results in a speedup of almost 7 times, almost in line with the increase of resouces given. This reasults in a efficiency of 0.86, pretty close to to an effiency of one. Given the amount of resources given, these results are to be as expected and are indicative that the implementation of the concurrent solution uses a balanced unit of descomposition and right distribution of resources.
+
+This also indicates that the amount of time taken in the serial parts of the program are brief enough as to not impact the total execution time. Another point to consider is the serialized parts within the parallel execution. These results are also indicative that these concurrency controls are also impacting the overall speedup that results from the parallelization of the processing of the matrixes.
+
+==== Distributed Simulation ====
+
+For this comparison, we will primarily be considering the last two tests, the concurrent with 1 process and 8 threads in one node and the distributed + concurrent version with 1 master node distributing the jobs, and 3 worker slave nodes with 8 threads each, giving a total of 24 processing threads overall. This, given that there is an overall increase of performance between the distributed execution and the concurrent execution, and as such comparisons with the serial version are not as necessary. 
+
+For this last execution test, the time taken to process all jobs dropped down to 1 hour 46 minutes, giving the least in execution time taken among all tests and as such also the one with the largest speed up, up to 18.52 times faster than the serial version and close to 3 times faster than the concurrent version. There is drop in terms of efficiency, as there are 24 times for resources than the serial execution test and 3 times more than the concurrent execution test. This lead to an efficiency of 0.77, still high and not too far from the efficiency from the concurrent and serial execution tests. The intersection in the graph of chart 2 being close to the results is also indicative, that this might be the best balance between speed up and efficiency. 
+
+Overall, the results resulted in a balance between efficiency and speedup, with a massive increase of performace when compared to the purelly serial execution time. These results are enough to prove the usefulness of not only the distributed nature of MPI across several systems in a node, but also of the combination of several optimization methods which also included the concurrent implemenation for each of the processes that was distributed among the nodes in the system. 
+
+=== Design ===
+
+Details on the design elements of this proyect in link:design/README.adoc[DESIGN]
+
 
 === Credits ===
 
