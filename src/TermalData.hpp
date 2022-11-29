@@ -44,6 +44,8 @@ struct JobInformation {
   int stateAmountRequired = 1;
 
   JobInformation(){}
+
+  // TODO: >> overload
 };
 
 #endif

@@ -64,6 +64,14 @@ int32_t receiveData(std::vector<JobInformation>& jobs, int32_t& processedJobs,
     int32_t* stringSizes, double* jobData, const int32_t rank);
 
 /**
+ * @brief Gets the path out of a file name
+ * 
+ * @param fileName complete file name with path
+ * @return std::string path of the file
+ */
+std::string getFilePath(std::string fileName);
+
+/**
  * @brief runs a stage of the simulation and
  * checks how many cell changes break equilibrium
  * 
@@ -199,7 +207,7 @@ void mpiRank0(std::string fileName, const int32_t size) {
   for (size_t job = 0; job < jobData->size(); ++job) {
     // receive time
     MPI_Recv(&(*jobData)[job].stateAmountRequired, 1,
-    MPI_INT, jobLocationArr[job], 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        MPI_INT, jobLocationArr[job], 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
   }
 
   // write report
@@ -376,25 +384,8 @@ std::vector<JobInformation>* TermalTransferS::getJobData
     throw std::runtime_error("Could not open txt file with job info");
   }
 
-  std::string extension;
-
-  bool extensionNotFound = true;
-  int position = fileName.size() - 1;
-
-  // find where the extension ends
-  while (extensionNotFound && position > 0) {
-    if (fileName[position] == 47) {
-      extensionNotFound = false;
-    }
-
-    position--;
-  }
-
-  // get the extension out of the file name
-  if (position != 0) {
-    position+=2;
-    extension = fileName.substr(0, position);
-  }
+  // get file path
+  std::string extension = getFilePath(fileName);
 
   int dataPosition = 0;
   int jobsFoundAmount  = 0;
@@ -405,6 +396,8 @@ std::vector<JobInformation>* TermalTransferS::getJobData
     // place a JobInformation on the vector
     dataVector->emplace_back(JobInformation());
 
+
+    //TODO: overload << to load data
     // place data on the jobInformation
     switch (dataPosition) {
       // place the file name
@@ -450,6 +443,31 @@ std::vector<JobInformation>* TermalTransferS::getJobData
   return dataVector;
 }
 
+// Gets the path out of a file name
+std::string getFilePath(std::string fileName) {
+  std::string extension;
+
+  bool extensionNotFound = true;
+  int position = fileName.size() - 1;
+
+  // find where the extension ends
+  while (extensionNotFound && position > 0) {
+    if (fileName[position] == '/') {
+      extensionNotFound = false;
+    }
+
+    position--;
+  }
+
+  // get the extension out of the file name
+  if (position != 0) {
+    position+=2;
+    extension = fileName.substr(0, position);
+  }
+
+  return extension;
+}
+
 // processess all jobs in the vector
 void TermalTransferS::processAllJobs(std::vector<JobInformation>* jobs,
     std::string& fileName, int32_t threadAmount) {
@@ -476,11 +494,10 @@ void TermalTransferS::processJob
   newData->resize(data->size());
 
   size_t stageCount = 0, wrongAmount = 0;
-  bool inEquilibrium = false;
 
   #pragma omp parallel num_threads(threadAmount) \
     default(none) shared(data, newData, jobInformation, \
-    stageCount, inEquilibrium, wrongAmount)
+    stageCount, wrongAmount)
   {  // NOLINT
     // copy all data from previous to new (to account for edges)
     #pragma omp for
@@ -499,26 +516,17 @@ void TermalTransferS::processJob
     while (!localEquilibrium) {
       // run a stage and receive wrong cell amount
       int localWrong = runStage(*data, *newData, jobInformation,
-      jobInformation->equilibriumPointSentivity);
+          jobInformation->equilibriumPointSentivity);
 
       // aggregate all non-equilibrium cells from all threads
-      #pragma omp critical
-      {
-        wrongAmount += localWrong;
-      }
+      #pragma omp atomic
+      wrongAmount += localWrong;
 
       // wait for all threads to report on their non-equilibrium cells
       #pragma omp barrier
 
       // check if in equilibrium
-      #pragma omp single
-      inEquilibrium = wrongAmount == 0;
-
-      // set shared as local equilibrium
-      #pragma omp critical
-      {
-        localEquilibrium = inEquilibrium;
-      }
+      localEquilibrium = wrongAmount == 0;
 
       // if not in equilibrium
       #pragma omp single
@@ -556,25 +564,26 @@ const double equilibriumPointSentivity) {
   int notInEquilibrium = 0;
 
   // get formula parameters
-  double time = jobInformation->stageTimeDuration,
-      alpha = jobInformation->termalDifusivity,
-      dimensions =
+  double time = jobInformation->stageTimeDuration;
+  double alpha = jobInformation->termalDifusivity;
+  double dimensions =
       jobInformation->cellDimensions * jobInformation->cellDimensions;
 
   // for each row
   #pragma omp for
   for (size_t row = 1; row < rowAmount - 1; ++row) {
     // for each column (each thread gets a row at a time)
+    #pragma omp simd
     for (size_t col = 1; col < colAmount - 1; ++col) {
       // find the sum of neighbors
       double sumOfNeightbors =
-      data[row][col - 1] + data[row - 1][col] +
-      data[row][col + 1] + data[row + 1][col] -
-      (4 * (data[row][col]));
+          data[row][col - 1] + data[row - 1][col] +
+          data[row][col + 1] + data[row + 1][col] -
+          (4 * (data[row][col]));
 
       // find the new state of the block
       newData[row][col] = data[row][col] +
-      (((time * alpha)/dimensions) * sumOfNeightbors);
+          (((time * alpha)/dimensions) * sumOfNeightbors);
 
       double difference = data[row][col] - newData[row][col];
       // ensure it is positive
@@ -598,8 +607,12 @@ Matrix<double>* TermalTransferS::getMatrix(JobInformation* jobInformation) {
   std::string fileName = jobInformation->extension + jobInformation->fileName;
 
   // open binary file
-  std::ifstream file;
+  std::ifstream file; 
   file.open(fileName, std::ios::binary);
+
+  if (!file.is_open()) {
+    throw std::runtime_error("Binary file could not be opened for a given job");
+  }
 
   size_t rowAmount = 0, colAmount = 0;
 
@@ -680,8 +693,9 @@ void TermalTransferS::eraseJobData(std::vector<JobInformation>* jobData) {
 
 void writeReport(std::vector<JobInformation>& jobsInformation,
     std::string fileName) {
+  // creates report file name: e.g. filepath/job020.tsv
   std::string newFileName =
-      fileName.substr(0, fileName.size() - 4) + ".tsv";;
+      fileName.substr(0, fileName.size() - 4) + ".tsv";
 
   // create binary file
   std::ofstream newFile(newFileName);
@@ -689,6 +703,8 @@ void writeReport(std::vector<JobInformation>& jobsInformation,
   size_t job = 0;
   // for each job
   while (job < jobsInformation.size()) {
+
+    // TODO: << subroutine
     // write the parameters given
     newFile << jobsInformation[job].fileName
         << "\t" << jobsInformation[job].stageTimeDuration
@@ -719,7 +735,7 @@ void writeReport(std::vector<JobInformation>& jobsInformation,
 static std::string format_time(const time_t seconds) {
   char text[48];  // YYYY/MM/DD hh:mm:ss
   const std::tm& gmt = * std::gmtime(&seconds);
-  snprintf(text, sizeof(text), "%04d/%02d/%02d\t%02d:%02d:%02d", gmt.tm_year
-    - 70, gmt.tm_mon, gmt.tm_mday - 1, gmt.tm_hour, gmt.tm_min, gmt.tm_sec);
+      snprintf(text, sizeof(text), "%04d/%02d/%02d\t%02d:%02d:%02d", gmt.tm_year
+      - 70, gmt.tm_mon, gmt.tm_mday - 1, gmt.tm_hour, gmt.tm_min, gmt.tm_sec);
   return text;
 }
