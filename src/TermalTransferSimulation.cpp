@@ -93,14 +93,6 @@ int runStage(Matrix<double>& data, Matrix<double>& newData,
 void writeReport(std::vector<JobInformation>& jobsInformation,
     std::string fileName);
 
-/**
- * @brief gets the time formated as string
- * 
- * @param seconds amount of seconds taken
- * @return std::string
- */
-static std::string format_time(const time_t seconds);
-
 // runs termal transfer simulation
 void TermalTransferS::runTermalTransferSimulation(int& argc, char**& argv) {
   if (argc > 1) {
@@ -387,55 +379,19 @@ std::vector<JobInformation>* TermalTransferS::getJobData
   // get file path
   std::string extension = getFilePath(fileName);
 
-  int dataPosition = 0;
   int jobsFoundAmount  = 0;
-  std::string currentData;
-
-  // while data can be extracted from the file
-  while (file >> currentData) {
-    // place a JobInformation on the vector
+  // read all jobs from the file
+  do {
+    // emplace back a new JobInformation struct
     dataVector->emplace_back(JobInformation());
 
-
-    //TODO: overload << to load data
-    // place data on the jobInformation
-    switch (dataPosition) {
-      // place the file name
-      case 0:
-        (*dataVector)[jobsFoundAmount].fileName = currentData.c_str();
-        break;
-      // place the time
-      case 1:
-        (*dataVector)[jobsFoundAmount].stageTimeDuration = stod(currentData);
-        break;
-      // place the termal difusivity
-      case 2:
-        (*dataVector)[jobsFoundAmount].termalDifusivity = stod(currentData);
-        break;
-      // place the cell dimensions
-      case 3:
-        (*dataVector)[jobsFoundAmount].cellDimensions = stod(currentData);
-        break;
-      // place epsilon
-      case 4:
-        (*dataVector)[jobsFoundAmount].
-            equilibriumPointSentivity = stod(currentData);
-        break;
-      default:
-        break;
-    }
-
-    // place the same extension on all JobInformations
+    // add the extension (all files share the extension)
     (*dataVector)[jobsFoundAmount].extension = extension;
+  // continue while a job can be read
+  } while (file >> (*dataVector)[jobsFoundAmount++]);
 
-    dataPosition++;
-
-    // advance to next job if all current data already placed
-    if (dataPosition == 5) {
-      jobsFoundAmount++;
-      dataPosition = 0;
-    }
-  }
+  // adjust amount of jobs found
+  jobsFoundAmount--;
 
   // shrink to size
   dataVector->resize(jobsFoundAmount);
@@ -570,10 +526,9 @@ const double equilibriumPointSentivity) {
       jobInformation->cellDimensions * jobInformation->cellDimensions;
 
   // for each row
-  #pragma omp for
+  #pragma omp for simd collapse (2)
   for (size_t row = 1; row < rowAmount - 1; ++row) {
     // for each column (each thread gets a row at a time)
-    #pragma omp simd
     for (size_t col = 1; col < colAmount - 1; ++col) {
       // find the sum of neighbors
       double sumOfNeightbors =
@@ -607,9 +562,10 @@ Matrix<double>* TermalTransferS::getMatrix(JobInformation* jobInformation) {
   std::string fileName = jobInformation->extension + jobInformation->fileName;
 
   // open binary file
-  std::ifstream file; 
+  std::ifstream file;
   file.open(fileName, std::ios::binary);
 
+  // check if binary file is opened
   if (!file.is_open()) {
     throw std::runtime_error("Binary file could not be opened for a given job");
   }
@@ -662,6 +618,12 @@ void TermalTransferS::writeMatrixOnFile(Matrix<double>& dataMatrix,
   // create binary file
   std::ofstream newFile(newFileName, std::ios::binary);
 
+  // ensure file is actually open
+  if (!newFile.is_open()) {
+    throw std::runtime_error
+        ("Binary file could not be opened to write new plate");
+  }
+
   // write matrix dimensions
   newFile.write(reinterpret_cast<const char*>(&rowAmount), sizeof(size_t));
   newFile.write(reinterpret_cast<const char*>(&colAmount), sizeof(size_t));
@@ -701,41 +663,11 @@ void writeReport(std::vector<JobInformation>& jobsInformation,
   std::ofstream newFile(newFileName);
 
   size_t job = 0;
-  // for each job
-  while (job < jobsInformation.size()) {
-
-    // TODO: << subroutine
-    // write the parameters given
-    newFile << jobsInformation[job].fileName
-        << "\t" << jobsInformation[job].stageTimeDuration
-        << "\t" << jobsInformation[job].termalDifusivity
-        << "\t" << jobsInformation[job].cellDimensions
-        << "\t" << jobsInformation[job].equilibriumPointSentivity;
-
-    // get the time
-    double totalTime = jobsInformation[job].stageTimeDuration *
-    jobsInformation[job].stateAmountRequired;
-
-    // add stage amount
-    newFile << "\t" <<
-    jobsInformation[job].stateAmountRequired;
-
-    // add time information
-    newFile << "\t" << format_time(totalTime);
-
-    // next line
-    newFile << "\n";
-    ++job;
+  // write all jobs into the report
+  while (job < jobsInformation.size() &&
+      newFile << jobsInformation[job++]) {
   }
 
+  // close file
   newFile.close();
-}
-
-// gets the time formated as string
-static std::string format_time(const time_t seconds) {
-  char text[48];  // YYYY/MM/DD hh:mm:ss
-  const std::tm& gmt = * std::gmtime(&seconds);
-      snprintf(text, sizeof(text), "%04d/%02d/%02d\t%02d:%02d:%02d", gmt.tm_year
-      - 70, gmt.tm_mon, gmt.tm_mday - 1, gmt.tm_hour, gmt.tm_min, gmt.tm_sec);
-  return text;
 }
