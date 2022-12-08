@@ -239,7 +239,7 @@ void stopProcessess(const int32_t size) {
 
     // signal there is no more to do
     MPI_Send(&condition, /* amount */1, MPI_LONG_LONG,
-        rankToSend, 0, MPI_COMM_WORLD);
+        rankToSend, 1, MPI_COMM_WORLD);
   }
 }
 
