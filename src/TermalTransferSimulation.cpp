@@ -54,7 +54,7 @@ void mpiRankAny(const int32_t rank,
  * @param stages reference to amount of stages already processed
  * @return int32_t 
  */
-int32_t receiveData(int64_t& stages);
+int32_t receiveData(size_t& stages);
 
 /**
  * @brief Gets the information for a job at a given position
@@ -191,38 +191,40 @@ void mpiRank0(std::string fileName, const int32_t size) {
 
 // sends data to all processes that request it
 void sendData(std::vector<JobInformation>& jobData, const int32_t size) {
-  int32_t time = -1;
+  size_t time = 0;
   int32_t rankToSend = -1;
 
   // create array holding which job is being processed by which process
-  int32_t kJobLocationArr[size]; // NOLINT
+  int64_t kJobLocationArr[size]; // NOLINT
+
+  int64_t jobAmount = (int64_t) jobData.size(); // NOLINT
 
   // for all jobs
-  for (size_t job = 0; job < jobData.size(); ++job) {
+  for (int64_t currentJob = 0; currentJob < jobAmount; ++currentJob) {
     // receive signal from processes ready to process
     MPI_Status status;
     MPI_Recv(&time, 1,
     MPI_LONG_LONG, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &status);
 
     // save which process did which job
-    kJobLocationArr[rankToSend] = job;
+    kJobLocationArr[rankToSend] = currentJob;
 
     // set received time in correct job
-    if (time != -1) {
+    if (time != INT64_MAX) {
       jobData[kJobLocationArr[rankToSend] - 1].stateAmountRequired = time;
     }
 
     rankToSend = status.MPI_SOURCE;
 
-    MPI_Send(&job, /* amount */1, MPI_INT,
-        rankToSend, 0, MPI_COMM_WORLD);
+    MPI_Send(&currentJob, /* amount */1, MPI_LONG_LONG,
+        rankToSend, 1, MPI_COMM_WORLD);
   }
 }
 
 // sends stop conditions to stop all processes
 void stopProcessess(const int32_t size) {
   int32_t rankToSend = -1;
-  int32_t condition = -1;
+  int64_t condition = -1;
   int64_t buffer = 0;
 
   // for all processess (stop conditions)
@@ -236,7 +238,7 @@ void stopProcessess(const int32_t size) {
     rankToSend = status.MPI_SOURCE;
 
     // signal there is no more to do
-    MPI_Send(&condition, /* amount */1, MPI_INT,
+    MPI_Send(&condition, /* amount */1, MPI_LONG_LONG,
         rankToSend, 0, MPI_COMM_WORLD);
   }
 }
@@ -248,12 +250,12 @@ void mpiRankAny(const int32_t rank,
 
   JobInformation job;
   int32_t processedJobs = 0;
-  int64_t stages = -1;
+  size_t stages = INT64_MAX;
 
   // while there are jobs
   while (true) {
     // receive all data for the job
-    int position =
+    int64_t position =
     receiveData(stages);
 
     // end loop if no more data has been received
@@ -275,15 +277,15 @@ void mpiRankAny(const int32_t rank,
 }
 
 // Receives data for worker process from administrating process
-int32_t receiveData(int64_t& stages) {
-  int32_t jobPosition = -1;
+int32_t receiveData(size_t& stages) {
+  int64_t jobPosition = -1;
 
   // send ready to process
   MPI_Send(&stages, 1, MPI_LONG_LONG, /*destination*/ 0, 0, MPI_COMM_WORLD);
 
-  // receive string sizes
+  // receive position of the job/plate
   MPI_Recv(&jobPosition, 1,
-    MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    MPI_LONG_LONG, 0, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
   return jobPosition;
 }
@@ -396,10 +398,13 @@ void TermalTransferS::processJob
   newData.resize(data.size());
 
   size_t stageCount = 0, wrongAmount = 0;
+  
+  Matrix<double>* dataPointer = &data;
+  Matrix<double>* newDataPointer = &newData;
 
   #pragma omp parallel num_threads(threadAmount) \
-    default(none) shared(data, newData, jobInformation, \
-    stageCount, wrongAmount)
+      default(none) shared(data, newData, dataPointer, newDataPointer, \
+      jobInformation, stageCount, wrongAmount, std::cout)
   {  // NOLINT
     // copy all data from previous to new (to account for edges)
     #pragma omp for
@@ -417,7 +422,7 @@ void TermalTransferS::processJob
     // while the matrix is not in equilibrium
     while (!localEquilibrium) {
       // run a stage and receive wrong cell amount
-      int localWrong = runStage(data, newData, jobInformation,
+      int localWrong = runStage(*dataPointer, *newDataPointer, jobInformation,
           jobInformation.equilibriumPointSentivity);
 
       // aggregate all non-equilibrium cells from all threads
@@ -436,12 +441,15 @@ void TermalTransferS::processJob
         /* swap matrixes (data will always have old data)
         * old data will be overwritten and lost within the matrixes
         */
-        mySwap(data, newData);
+        std::swap(*dataPointer, *newDataPointer);
       }
 
       // increase stages processed and reset coincidence amount
       #pragma omp single
       {
+        if (stageCount % 100000 == 0) {
+          std::cout << stageCount << std::endl;
+        }
         stageCount++;
         wrongAmount = 0;
       }
