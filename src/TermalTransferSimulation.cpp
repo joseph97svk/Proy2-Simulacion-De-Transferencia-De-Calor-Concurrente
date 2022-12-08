@@ -447,9 +447,6 @@ void TermalTransferS::processJob
       // increase stages processed and reset coincidence amount
       #pragma omp single
       {
-        if (stageCount % 100000 == 0) {
-          std::cout << stageCount << std::endl;
-        }
         stageCount++;
         wrongAmount = 0;
       }
