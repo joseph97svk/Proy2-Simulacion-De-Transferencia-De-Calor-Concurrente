@@ -87,6 +87,22 @@ It is important to have a configuration file for the use of MPI. The lack of the
 
 It is important to note, that this program will asume that all jobs, that meaning the bin files containing the respective plate matrixes, are in the same folder as the txt file listing them. The solutions and the report will also be written on the same folder. If these files are, otherwise, in another location, the program will not find them and report the error. 
 
+==== On txt file ====
+
+This program requires that the `.txt` file with the job/plate information be given in an specific format.
+Each line represents a job/plate and must be given as following:
+
+<name of binary file> <duration of each step in seconds> <material termal difusivity> <cell dimension> <equilibrium point sensitivity> 
+
+as in the following example:
+
+`plate001.bin  1200  127  1000  2`
+
+If a file is given with the incorrect format or information for each job, the execution of the program will stop and an error indicating the cause will be printed on the console.
+
+==== On binary files ====
+
+This file must have the `.bin` extension.The binary file must include, in the first 16 bytes, 8 bytes for the amount of rows in unsigned long long format, and 8 bytes for the amount of columns in unsigned long long format. The remaining bytes are to be of double type, where each 8 bytes represent the temperature of each cell. 
 
 ==== Testing software ====
 

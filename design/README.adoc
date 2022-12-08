@@ -36,4 +36,4 @@ Once all jobs are done for each process, it will wait until signaled by process 
 
 === Pseudocode ===
 
-include::ConcurrentMPI.pseudo[]
+include::DistributedMPI.pseudo[]

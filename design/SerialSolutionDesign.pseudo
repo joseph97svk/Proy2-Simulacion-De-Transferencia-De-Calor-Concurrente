@@ -1,5 +1,5 @@
-struct JobInformation 
-
+record JobInformation
+ 
   string fileName
   string extension
   double stageDuration
@@ -8,114 +8,112 @@ struct JobInformation
   double equilibriumPointSensitivity
   int stateAmountRequired
 
-runTermalTransferSimulation() {
+end record
+
+procedure runTermalTransferSimulation() 
 
   jobData := getJobData(fileName)
   processAllJobs(jobData)
   erase all job data
 
-}
+end procedure
 
-getJobData() {
+procedure getJobData(fileName) 
 
   create vector for jobs
-  open txt file with job info
+  file := openFile(fileName)
   find where the extension ends
   get the extension out of the file name
+  while data can be extracted from the file do
+    jobs[jobsFound] := read(file)
+    jobsFound := jobsFound + 1
+  end while
+  closeFile(file)
 
-  while (data can be extracted from the file)
-    place a JobInformation on the vector
-    place data on the jobInformation
-    place the same extension on all JobInformations
-    advance to next job if all current data already placed
-  
-  close file
-}
+end procedure
 
-processAllJobs() {
+procedure processAllJobs() 
 
-  for all jobs
-    processJob(current job)
-
+  for job := 0 to jobAmount do
+    processJob(jobs[job])
+  end for
   writeReport()
 
-}
+end procedure
 
-processJob() {
+procedure processJob(currentJob)
 
-  get matrix out of binary file
-  set a new matrix for new data
-  copy all data from previous to new (to account for edges)
+  dataMatrix := getMatrix()
+  newData := dataMatrix
+  inEquilibrium := false
+  while inEquilibrium = false do
+    notInEquilibrium := runStage()
+    if notInquilibrium = 0 do
+      inEquilibrium := true
+    end if
+    swap(dataMatrix, newData)
+    stagesProcessed := stagesProcessed + 1
+    notInEquilibrium := 0
+  end while
+  writeMatrixOnFile(newData)
 
-  while (the matrix is not in equilibrium)
-    not in equilibrium amount := runStage()
-    check if in equilibrium
-    swap matrixes (data will always have old data)
-    increase stages processed and reset not in equilibrium cell amount
+end procedure
 
-  write results on new file
-
-}
-
-getMatrix() {
+procedure getMatrix(fileName)
 
   get complete path with file name
   open binary file
   read matrix cellDimensions
   make new matrix
-  
-  for each row
+  for row := 0 to rowAmount do
     read from file into matrix file
-
+  end for
   close file
-
   return matrix
 
-}
+end procedure
 
-writeMatrixOnFile() {
-
+procedure writeMatrixOnFile(newData)
+ 
   get dimensions
   get new file name
   create binary file
   write matrix dimensions on file
-
-  for each row
+  for row := 0 to rowAmount do
     write matrix row on file
-
+  end for
   close file
-}
+  
+end procedure
 
-runStage() {
+procedure runStage(data, newData, parameters)
+
   get sizes
   get formula parameters
-
-  for each row
-    for each column
+  for row := 0 to rowAmount do
+    for col := 0 to colAmount do
       find the sum of neighbors
       find the new state of the block
-      get difference between new and old data
+      difference := abs(data, newData)
+      if difference > epsilom do
+        notInEquilibriumAmount := notInEquilibriumAmount + 1
+      end if
+    end for
+  end for
+  return notInequilibriumAmount
 
-      if it is not within epsilom
-        add to not in equilibrium amount
-
-  return not in equilibrium amount
-
-}
+end procedure
 
   
 
-writeReport() {
+procedure writeReport() 
 
   open original txt file
   create new report file
-  
-  for each line read
-    write it to the new file
-    get the time
-    add time information
-    add next line
-
+  while job < jobAmount do
+    write on file
+    job++
+  end while
   close all files
 
-}
+end procedure

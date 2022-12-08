@@ -16,6 +16,24 @@ Universidad de Costa Rica. CC BY 4.0 */
   reinterpret_cast<type>(unit)
 
 /**
+ * @brief processess all jobs in the vector with one thread
+ * 
+ * @param jobs vector of jobs to be processed
+ * @param fileName name of file where all jobs/plates are located
+ * @param threadAmount amount of threads expected to run
+ */
+void processAllJobsST(std::vector<JobInformation>& jobs,
+std::string& fileName, int32_t threadAmount);
+
+/**
+ * @brief processess the given job
+ * 
+ * @param jobInformation job to be processed
+ * @param threadAmount amount of threads expected to run
+ */
+void processJobST(JobInformation& jobInformation, int32_t threadAmount);
+
+/**
  * @brief administrative process handling task issue and process coordination
  * 
  * @param fileName name of file with all job/plate information
@@ -148,7 +166,7 @@ void TermalTransferS::runTermalTransferSimulation(int& argc, char**& argv) {
 
       // get job data
       TermalTransferS::getJobData(jobData, fileName);
-
+      
       // process everything
       TermalTransferS::processAllJobs(jobData, fileName, threadAmount);
 
@@ -376,6 +394,15 @@ void TermalTransferS::processAllJobs(std::vector<JobInformation>& jobs,
     std::string& fileName, int32_t threadAmount) {
   int jobsAmount = jobs.size();
 
+  if (threadAmount == 1) {
+    // for all jobs
+    for (int currentJob = 0; currentJob < jobsAmount; ++currentJob) {
+      // process them
+      processJobST(jobs[currentJob], threadAmount);
+    }
+    return;
+  }
+
   // for all jobs
   for (int currentJob = 0; currentJob < jobsAmount; ++currentJob) {
     // process them
@@ -459,8 +486,111 @@ void TermalTransferS::processJob
   writeMatrixOnFile(newData, jobInformation);
 }
 
+// processess the given job
+void processJobST(JobInformation& jobInformation, int32_t threadAmount) {
+  (void) threadAmount;
+  // get the matrix out of the file
+  Matrix<double> data;
+  TermalTransferS::getMatrix(data, jobInformation);
+
+  // set a new matrix for new data
+  Matrix<double> newData;
+  newData.resize(data.size());
+
+  size_t stageCount = 0, wrongAmount = 0;
+  
+  Matrix<double>* dataPointer = &data;
+  Matrix<double>* newDataPointer = &newData;
+
+  // copy all data from previous to new (to account for edges)
+  for (size_t row = 0; row < newData.size(); ++row) {
+    newData[row].resize(data[0].size());
+
+    // each thread takes a row at a time
+    for (size_t col = 0; col < newData[row].size(); ++col) {
+      newData[row][col] = data[row][col];
+    }
+  }
+
+  bool localEquilibrium = false;
+
+  // while the matrix is not in equilibrium
+  while (!localEquilibrium) {
+    // run a stage and receive wrong cell amount
+    wrongAmount = runStage(*dataPointer, *newDataPointer, jobInformation,
+        jobInformation.equilibriumPointSentivity);
+
+    // check if in equilibrium
+    localEquilibrium = wrongAmount == 0;
+
+    // if not in equilibrium
+    if (!localEquilibrium) {
+      /* swap matrixes (data will always have old data)
+      * old data will be overwritten and lost within the matrixes
+      */
+      std::swap(*dataPointer, *newDataPointer);
+    }
+
+    // increase stages processed and reset coincidence amount
+    stageCount++;
+    wrongAmount = 0;
+  }
+
+  jobInformation.stateAmountRequired = stageCount;
+
+  // write results on new file
+  TermalTransferS::writeMatrixOnFile(newData, jobInformation);
+}
+
 // returns a matrix of the data found in the file data
 int runStage(Matrix<double>& data, Matrix<double>& newData,
+    JobInformation& jobInformation, const double equilibriumPointSentivity) {
+  // get sizes
+  size_t rowAmount = data.size(),
+      colAmount = data[0].size();
+
+  int notInEquilibrium = 0;
+
+  // get formula parameters
+  double time = jobInformation.stageTimeDuration;
+  double alpha = jobInformation.termalDifusivity;
+  double dimensions =
+      jobInformation.cellDimensions * jobInformation.cellDimensions;
+
+  // for each row
+  #pragma omp for simd collapse (2)
+  for (size_t row = 1; row < rowAmount - 1; ++row) {
+    // for each column (each thread gets a row at a time)
+    for (size_t col = 1; col < colAmount - 1; ++col) {
+      // find the sum of neighbors
+      double sumOfNeightbors =
+          data[row][col - 1] + data[row - 1][col] +
+          data[row][col + 1] + data[row + 1][col] -
+          (4 * (data[row][col]));
+
+      // find the new state of the block
+      newData[row][col] = data[row][col] +
+          (((time * alpha)/dimensions) * sumOfNeightbors);
+
+      double difference = data[row][col] - newData[row][col];
+      // ensure it is positive
+      if (difference < 0) {
+        difference = -difference;
+      }
+
+      // check if it is within epsilom
+      if (difference > equilibriumPointSentivity) {
+        notInEquilibrium++;
+      }
+    }
+  }
+
+  return notInEquilibrium;
+}
+
+
+// returns a matrix of the data found in the file data
+int runStageST(Matrix<double>& data, Matrix<double>& newData,
 JobInformation& jobInformation,
 const double equilibriumPointSentivity) {
   // get sizes
@@ -476,7 +606,6 @@ const double equilibriumPointSentivity) {
       jobInformation.cellDimensions * jobInformation.cellDimensions;
 
   // for each row
-  #pragma omp for simd collapse (2)
   for (size_t row = 1; row < rowAmount - 1; ++row) {
     // for each column (each thread gets a row at a time)
     for (size_t col = 1; col < colAmount - 1; ++col) {
