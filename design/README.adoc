@@ -4,13 +4,15 @@
 
 The serial part of the design consists in the extraction of the data, the processing of the data and finally its storage and report production. A txt first is read from where all jobs are extracted. For each job, the name, and the parameters are extracted and added to a JobInformation struct where the extension of the original file is also added. All jobs are added to a vector. 
 
-Once all jobs are extracted, all jobs are then processed. At each job the matrix is extracted from the bin file where the plate is stored. For each job, it is desired to know the state and the amount of stages necessary to get to such state under equilibrium. As such while it is not in equilibrium, it will continue running a stage. At each stage processing the matrix is traveled, where each cell gets its new temperature value calculated and checks how many cells are not in equilibrium. The while loop stops once this amount of cells reaches 0.
 
 Once the plate is in equilibrium, the state is stored in a binary file. Once all jobs are finished, all values for the time taken are then written on a report file. 
 
 === Pseudocode ===
 
+[source,delphi]
+----
 include::SerialSolutionDesign.pseudo[]
+----
 
 == OpenMp Concurrent Solution ==
 
@@ -20,7 +22,10 @@ Each thread then processes the rows' new state and also find the amount of cells
 
 === Pseudocode ===
 
+[source,delphi]
+----
 include::ConcurrentOpenMp.pseudo[]
+----
 
 == MPI Distributed Solution ==
 
@@ -36,4 +41,7 @@ Once all jobs are done for each process, it will wait until signaled by process 
 
 === Pseudocode ===
 
+[source,delphi]
+----
 include::DistributedMPI.pseudo[]
+----

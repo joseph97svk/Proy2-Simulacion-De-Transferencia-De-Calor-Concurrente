@@ -166,7 +166,7 @@ void TermalTransferS::runTermalTransferSimulation(int& argc, char**& argv) {
 
       // get job data
       TermalTransferS::getJobData(jobData, fileName);
-      
+
       // process everything
       TermalTransferS::processAllJobs(jobData, fileName, threadAmount);
 
@@ -425,7 +425,7 @@ void TermalTransferS::processJob
   newData.resize(data.size());
 
   size_t stageCount = 0, wrongAmount = 0;
-  
+
   Matrix<double>* dataPointer = &data;
   Matrix<double>* newDataPointer = &newData;
 
@@ -498,7 +498,7 @@ void processJobST(JobInformation& jobInformation, int32_t threadAmount) {
   newData.resize(data.size());
 
   size_t stageCount = 0, wrongAmount = 0;
-  
+
   Matrix<double>* dataPointer = &data;
   Matrix<double>* newDataPointer = &newData;
 
@@ -663,9 +663,10 @@ void TermalTransferS::getMatrix
   for (size_t row = 0; row < rowAmount; ++row) {
     // resize each row
     dataMatrix[row].resize(colAmount);
-      // read from file and into matrix
-      file.read(reinterpret_cast<char*>
-          (&(dataMatrix[row][0])), sizeof(double) * colAmount);
+
+    // read from file and into matrix
+    file.read(reinterpret_cast<char*>
+        (&(dataMatrix[row][0])), sizeof(double) * colAmount);
   }
 
   // close file

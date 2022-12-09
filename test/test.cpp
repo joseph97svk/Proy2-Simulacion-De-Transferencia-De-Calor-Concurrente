@@ -43,31 +43,39 @@ int main(int argc, char* argv[]) {
     return EXIT_FAILURE;
   }
 
-  // get file names
-  std::string fileNameA = argv[1];
-  std::string fileNameB = argv[2];
+  try {
+    // get file names
+    std::string fileNameA = argv[1];
+    std::string fileNameB = argv[2];
 
-  // get epsilon
-  double epsilon = std::stod(argv[3]);
+    // get epsilon
+    double epsilon = std::stod(argv[3]);
 
-  // extract matrixes from files
-  Matrix<double>* matrixA = getMatrix(fileNameA);
-  Matrix<double>* matrixB = getMatrix(fileNameB);
+    // extract matrixes from files
+    Matrix<double> matrixA; 
+    getMatrix(matrixA, fileNameA);
+    Matrix<double> matrixB; 
+    getMatrix(matrixB, fileNameB);
 
-  // compare matrixes
-  if (compareMatrixes(*matrixA, *matrixB, epsilon)) {
-    std::cout << "All good!" << std::endl;
+    // compare matrixes
+    if (compareMatrixes(matrixA, matrixB, epsilon)) {
+      std::cout << "All good!" << std::endl;
+    }
+  } catch (const std::exception& error) {
+    std::cerr << "error: " << error.what() << std::endl;
   }
-
-  delete matrixA;
-  delete matrixB;
 }
 
 // returns address of matrix with data extracted from file with file name
-Matrix<double>* getMatrix(std::string fileName) {
+void getMatrix(Matrix<double>& dataMatrix, std::string fileName) {
   // open binary file
   std::ifstream file;
   file.open(fileName, std::ios::binary);
+
+  // check if binary file is opened
+  if (!file.is_open()) {
+    throw std::runtime_error("Binary file could not be opened for a given job");
+  }
 
   size_t rowAmount = 0, colAmount = 0;
 
@@ -75,31 +83,21 @@ Matrix<double>* getMatrix(std::string fileName) {
   file.read(reinterpret_cast<char*>(&rowAmount), sizeof(size_t));
   file.read(reinterpret_cast<char*>(&colAmount), sizeof(size_t));
 
-  // make new matrix
-  Matrix<double>* dataMatrix = new Matrix<double>;
-
-  // set reference for ease of use
-  Matrix<double>& matrixRef = *dataMatrix;
-
   // set size of matrix
-  dataMatrix->resize(rowAmount);
+  dataMatrix.resize(rowAmount);
 
   // for each row
   for (size_t row = 0; row < rowAmount; ++row) {
     // resize each row
-    matrixRef[row].resize(colAmount);
-    // for each column
-    for (size_t col = 0; col < colAmount; ++col) {
-      // read from file and into matrix
-      file.read(reinterpret_cast<char*>
-          (&(matrixRef[row][col])), sizeof(double));
-    }
+    dataMatrix[row].resize(colAmount);
+
+    // read from file and into matrix
+    file.read(reinterpret_cast<char*>
+        (&(dataMatrix[row][0])), sizeof(double) * colAmount);
   }
 
   // close file
   file.close();
-
-  return dataMatrix;
 }
 
 // compares two matrixes and returns if they are equal within given parameters
