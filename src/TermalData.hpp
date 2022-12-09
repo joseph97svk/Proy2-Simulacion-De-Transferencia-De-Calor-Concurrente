@@ -42,7 +42,9 @@ struct JobInformation {
    * @brief total amount of stages that it took for plate
    * to reach equilibrium
    */
-  int stateAmountRequired = 1;
+  int64_t stateAmountRequired = 1;
+
+  ~JobInformation() = default;
 
   /**
    * @brief overload of operator >>

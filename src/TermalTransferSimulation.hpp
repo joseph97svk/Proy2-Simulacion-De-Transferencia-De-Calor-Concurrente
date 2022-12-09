@@ -35,34 +35,38 @@ namespace TermalTransferS {
   /**
    * @brief returns a vector of jobs found within file from file name
    * 
+   * @param dataVector vector where all data will stored
    * @param fileName name of file where jobs are extracted
-   * @return std::vector<JobInformation>* 
    */
-  std::vector<JobInformation>* getJobData(std::string& fileName);
+  void getJobData
+      (std::vector<JobInformation>& dataVector, std::string& fileName);
 
   /**
    * @brief processess all jobs in the vector
    * 
    * @param jobs vector of jobs to be processed
-   * @param fileName name of file where jobs were extracted
+   * @param fileName name of file where all jobs/plates are located
+   * @param threadAmount amount of threads expected to run
    */
-  void processAllJobs(std::vector<JobInformation>* jobs,
+  void processAllJobs(std::vector<JobInformation>& jobs,
   std::string& fileName, int32_t threadAmount);
 
   /**
    * @brief processess the given job
    * 
    * @param jobInformation job to be processed
+   * @param threadAmount amount of threads expected to run
    */
-  void processJob(JobInformation* jobInformation, int32_t threadAmount);
+  void processJob(JobInformation& jobInformation, int32_t threadAmount);
 
   /**
    * @brief returns a matrix of the data found in the file data
    * @details opens file from jobInformation filename to extract data
+   * @param dataMatrix matrix were all data will be stored
    * @param jobInformation has file name of file with binary data
-   * @return Matrix<double>* 
    */
-  Matrix<double>* getMatrix(JobInformation* jobInformation);
+  void getMatrix
+    (Matrix<double>& dataMatrix, JobInformation& jobInformation);
 
   /**
    * @brief writes matrix data on binary file
@@ -72,7 +76,7 @@ namespace TermalTransferS {
    * other related information
    */
   void writeMatrixOnFile(Matrix<double>& dataMatrix,
-  JobInformation* jobInformation);
+  JobInformation& jobInformation);
 
   /**
    * @brief erases all data related to JobInformation struct

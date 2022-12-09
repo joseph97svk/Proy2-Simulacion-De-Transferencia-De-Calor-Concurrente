@@ -1,0 +1,78 @@
+procedure runTermalTransferSimulation()
+
+  Initiate distributed communication environment
+  get the rank of the current process
+  get the amount of processes
+  if there is just one process do
+    jobData := getJobData(fileName)
+    processAllJobs(jobData)
+  else 
+    if rank = 0 do
+      mpiRank0()
+    else
+      mpiRankAny()
+    end if
+  end if
+
+end procedure
+
+procedure mpiRank0()
+
+  getJobData()
+  sendData()
+  stopProcesses()
+  writeReport()
+
+end procedure
+
+procedure sendData()
+
+  get size of extension
+  for job := 0 to jobsAmount do
+    receive(&time, 1, any, &status)
+    rankToSend := status.rank
+    send(jobs[job], 1, rankToSend)
+  end for
+
+end procedure
+
+procedure stopProcesses()
+
+  for process:= 0 to all processess do
+    receive(&buffer, 1, any, &status)
+    rankToSend := status.rank
+    send(-1, 1, rankToSend)
+  end for
+
+end procedure
+
+procedure mpiRankAny()
+
+  while true do
+    jobPosition := receiveData()
+    if there is no data do
+      break cycle
+    end if
+    job := getSingleJob(jobPosition, fileName)
+    processJob(job)
+  end while
+
+end procedure
+
+procedure receiveData()
+
+  send(&time, 1, 0)
+  receive(&jobPosition, 1, 0)
+  return jobPosition
+
+end procedure
+
+procedure getSingleJob(position, fileName)
+
+  file :=openFile(fileName)
+  while currentPosition < position do
+    job := file
+  end while
+  return job
+
+end procedure

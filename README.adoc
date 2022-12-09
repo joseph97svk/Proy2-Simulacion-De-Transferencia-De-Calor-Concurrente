@@ -87,6 +87,24 @@ It is important to have a configuration file for the use of MPI. The lack of the
 
 It is important to note, that this program will asume that all jobs, that meaning the bin files containing the respective plate matrixes, are in the same folder as the txt file listing them. The solutions and the report will also be written on the same folder. If these files are, otherwise, in another location, the program will not find them and report the error. 
 
+==== On txt file ====
+
+This program requires that the `.txt` file with the job/plate information be given in an specific format.
+Each line represents a job/plate and must be given as following:
+
+<name of binary file> <duration of each step in seconds> <material termal difusivity> <cell dimension> <equilibrium point sensitivity> 
+
+as in the following example:
+
+`plate001.bin  1200  127  1000  2`
+
+If a file is given with the incorrect format or information for each job, the execution of the program will stop and an error indicating the cause will be printed on the console.
+
+==== On binary files ====
+
+This file must have the `.bin` extension.The binary file must include, in the first 16 bytes, 8 bytes for the amount of rows in unsigned long long format, and 8 bytes for the amount of columns in unsigned long long format. The remaining bytes are to be of double type, where each 8 bytes represent the temperature of each cell. 
+
+If the binary file is given in the incorrect format or in the wrong format, the execution of the program will stop and an error indicating the cause will be printed on the console.
 
 ==== Testing software ====
 
@@ -137,14 +155,38 @@ This also indicates that the amount of time taken in the serial parts of the pro
 
 For this comparison, we will primarily be considering the last two tests, the concurrent with 1 process and 8 threads in one node and the distributed + concurrent version with 1 master node distributing the jobs, and 3 worker slave nodes with 8 threads each, giving a total of 24 processing threads overall. This, given that there is an overall increase of performance between the distributed execution and the concurrent execution, and as such comparisons with the serial version are not as necessary. 
 
-For this last execution test, the time taken to process all jobs dropped down to 1 hour 46 minutes, giving the least in execution time taken among all tests and as such also the one with the largest speed up, up to 18.52 times faster than the serial version and close to 3 times faster than the concurrent version. There is drop in terms of efficiency, as there are 24 times for resources than the serial execution test and 3 times more than the concurrent execution test. This lead to an efficiency of 0.77, still high and not too far from the efficiency from the concurrent and serial execution tests. The intersection in the graph of chart 2 being close to the results is also indicative, that this might be the best balance between speed up and efficiency. 
+For this last execution test, the time taken to process all jobs dropped down to 1 hour 46 minutes, giving the least in execution time taken among all tests and as such also the one with the largest speed up, up to 18.52 times faster than the serial version and close to 3 times faster than the concurrent version. There is drop in terms of efficiency, as there are 24 times for resources than the serial execution test and 3 times more than the concurrent execution test. This lead to an efficiency of 0.77, still high and not too far from the efficiency from the concurrent and serial execution tests. The intersection in the graph of chart 2 being close to the results is also indicative, that this might be the best balance between speed up and efficiency.
 
 Overall, the results resulted in a balance between efficiency and speedup, with a massive increase of performace when compared to the purelly serial execution time. These results are enough to prove the usefulness of not only the distributed nature of MPI across several systems in a node, but also of the combination of several optimization methods which also included the concurrent implemenation for each of the processes that was distributed among the nodes in the system. 
+
+=== Perfomance Analisis V2 ===
+
+[#img-PerformaceTestingResultsTableV2.png]
+image::PerformanceAnalisis/PerformanceTestingResultsTableV2.png[]
+
+Table 2. Table on the time, speedup, efficiency and core amount (resources) for each execution testing. 
+
+[#img-TimeSpeedUpChartV2.png]
+image::PerformanceAnalisis/TimeSpeedUpChartV2.png[]
+
+Chart 3. Chart comparing the time taken and speedup for each execution testing. 
+
+[#img-SpeedUpEfficiencyChartV2.png]
+image::PerformanceAnalisis/SpeedUpEfficiencyChartV2.png[]
+
+Chart 4. Chart comparing the speedup and the efficiency of each execution testing.
+
+Results after the corrections largely reflect the same as before them, however, there is a general speed up across all the tests done. The most significant pattern being the considerable speedups as the concurrence is increased. This is mostly seen in terms of efficiency, where the efficiency for concurrent test and the distributed with concurrency test have a around 40% greater efficiency than the serial version. 
+
+This shows that the increase in resources have largely been corresponded with a similar or greater increase in performance. The unusual increase of efficiency from the serial to the concurrent version may be attributed to the different ways in which the workload is parallelized in that version. Matrixes are distributed between threads and for each thread, their workload is processed by parallel simd units within the processor, increasing the parallelism further. Another further reason that can be attributed, is that this workload is unsuited for serial processing, and as such, gets further benefits from data parallelism or that such lack of affinity penalizes performance, such that the lack of parallelism leads to massive amounts of execution time.
+
+The increase of performance, along with an unchanging effiency, means that the distribution of workloads, at least for this test case has been balanced. But it may also be attributed to the previous work parallelizing the data processing, which, upon being split and given to different processors, may have lead to better utilization of available resources. The intersection between speed up and efficiency being close to the results of this implementation further indicates the benefits of this approach.
+
+The serial version still shows a great deal of inefficiency, when compared to the concurrent and distributed versions, regardless of the corrections and additional optimizations. Disregarding the differences in amounts, and effiency, when comparing these and the previous results, the conclusions and the previous analysis remains the same.
 
 === Design ===
 
 Details on the design elements of this proyect in link:design/README.adoc[DESIGN]
-
 
 === Credits ===
 
